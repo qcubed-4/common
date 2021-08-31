@@ -543,10 +543,8 @@ abstract class QString
      * @return string The generated Random string
      * @throws Caller
      */
-    public static function getRandomString(
-        $intLength,
-        $strCharacterSet = self::LETTERS_NUMBERS
-    ) {
+    public static function getRandomString($intLength, $strCharacterSet = self::LETTERS_NUMBERS)
+    {
         // Cast in case there were something else
         $intLength = Type::cast($intLength, Type::INTEGER);
         $strCharacterSet = Type::cast($strCharacterSet, Type::STRING);
@@ -796,5 +794,22 @@ abstract class QString
      */
     public static function isInteger($strVal) {
         return(ctype_digit(strval($strVal)));
+    }
+
+    /**
+     * Convert file size in bytes to human readable
+     *
+     * @param  string  $strFile
+     * @param  integer $intPrecision
+     * @return  integer
+     */
+    public static function formatFileSize($strFile, $intPrecision = 2)
+    {
+        $intSize = filesize($strFile);
+
+        $suffixes = array('bytes', 'KB', 'MB', 'GB', 'TB', 'PB');
+        for ($i = 0; $intSize > 1024; $i++) $intSize /= 1024;
+
+        return round($intSize, $intPrecision) . ' ' . $suffixes[$i];
     }
 }
