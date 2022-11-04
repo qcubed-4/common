@@ -68,7 +68,7 @@ abstract class File
     public static function isWritable($path)
     {
         // recursively return a temporary file path
-        if ($path{strlen($path) - 1} == '/') {
+        if ($path[strlen($path) - 1] == '/') {
             return self::isWritable($path . uniqid(mt_rand()) . '.tmp');
         } elseif (is_dir($path)) {
             return self::isWritable($path . '/' . uniqid(mt_rand()) . '.tmp');

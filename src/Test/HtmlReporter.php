@@ -25,7 +25,6 @@
 
 namespace QCubed\Test;
 
-
 /**
  * HtmlReporter for local test case running. Saves the output in to a session variable so that our output displayer
  * can display it.
@@ -33,7 +32,7 @@ namespace QCubed\Test;
  * Class HtmlReporter
  * @package QCubed\Test
  */
-class HtmlReporter extends \PHPUnit_TextUI_ResultPrinter
+class HtmlReporter extends \PHPUnit\TextUI\DefaultResultPrinter
 {
     protected $results;
     protected $currentSuite;
@@ -52,18 +51,18 @@ class HtmlReporter extends \PHPUnit_TextUI_ResultPrinter
     }
 
 
-    public function write($buffer)
+    public function write(string $buffer): void
     {
         // noop this
     }
 
 
-    public function startTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function startTestSuite(\PHPUnit\Framework\TestSuite $suite): void
     {
         $this->currentSuite = $suite->getName();
         if ($this->currentSuite  &&
             ($tests = $suite->tests()) &&
-            $tests[0] instanceof \PHPUnit_Framework_TestSuite
+            $tests[0] instanceof \PHPUnit\Framework\TestSuite
         ) {
             // is actually a test group
             $this->currentGroup = $this->currentSuite;
@@ -74,43 +73,45 @@ class HtmlReporter extends \PHPUnit_TextUI_ResultPrinter
         }
     }
 
-    public function endTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function endTestSuite(\PHPUnit\Framework\TestSuite $suite): void
     {
         $this->currentSuite = null;
     }
 
 
-    public function startTest(\PHPUnit_Framework_Test $test)
+    public function startTest(\PHPUnit\Framework\Test $test): void
     {
         $this->currentTest = $test->getName();
         $this->results[$this->currentSuite][$test->getName()]['test'] = $test;
     }
 
-    public function addError(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addError(\PHPUnit\Framework\Test $test, \Throwable $e, float $time): void
     {
         $this->results[$this->currentSuite][$test->getName()]['status'] = 'error';
         $this->results[$this->currentSuite][$test->getName()]['errors'][] = compact('e', 'time');
     }
 
-    public function addFailure(\PHPUnit_Framework_Test $test, \PHPUnit_Framework_AssertionFailedError $e, $time)
+    public function addFailure(\PHPUnit\Framework\Test $test, \PHPUnit\Framework\AssertionFailedError $e, float $time) : void
     {
         $this->results[$this->currentSuite][$test->getName()]['status'] = 'failed';
         $this->results[$this->currentSuite][$test->getName()]['results'][] = compact('e', 'time');
     }
 
-    public function addIncompleteTest(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addIncompleteTest(\PHPUnit\Framework\Test $test, \Throwable $e, float $time): void
     {
         $this->results[$this->currentSuite][$test->getName()]['status'] = 'incomplete';
         $this->results[$this->currentSuite][$test->getName()]['errors'][] = compact('e', 'time');
     }
 
-    public function addSkippedTest(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addSkippedTest(\PHPUnit\Framework\Test $test, \Throwable $e, float $time): void
     {
         $this->results[$this->currentSuite][$test->getName()]['status'] = 'skipped';
         $this->results[$this->currentSuite][$test->getName()]['errors'][] = compact('e', 'time');
     }
 
-    public function endTest(\PHPUnit_Framework_Test $test, $time)
+    // https://phpunit.readthedocs.io/en/9.5/writing-tests-for-phpunit.html
+
+    public function endTest(\PHPUnit\Framework\Test $test, float $time): void
     {
         $t = &$this->results[$this->currentSuite][$test->getName()];
         if (!isset($t['status'])) {
@@ -120,7 +121,7 @@ class HtmlReporter extends \PHPUnit_TextUI_ResultPrinter
         $this->currentTest = null;
     }
 
-    public function printResult(\PHPUnit_Framework_TestResult $result)
+    public function printResult(\PHPUnit\Framework\TestResult $result) : void
     {
         $strHtml = '';
 
@@ -146,7 +147,7 @@ class HtmlReporter extends \PHPUnit_TextUI_ResultPrinter
                     foreach ($test['results'] as $error) {
                         $strMessage = $error['e']->__toString() . "\n";
                         // get first line
-                        $lines = explode("\n", \PHPUnit_Util_Filter::getFilteredStacktrace($error['e']));
+                        $lines = explode("\n", \PHPUnit\Util\Filter::getFilteredStacktrace($error['e']));
                         $strMessage .= $lines[0] . "\n";
                         $strHtml .= nl2br(htmlentities($strMessage)) . '<br />';
                     }

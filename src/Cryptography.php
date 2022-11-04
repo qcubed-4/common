@@ -76,7 +76,7 @@ class Cryptography extends ObjectBase
      */
     public static $Base64 = true;
 
-    /*
+    /**
      * @param null|string $strKey    Encryption key
      * @param null|bool   $blnBase64 Are we going to Base 64 the encoded data?
      * @param null|string $strCipher Cipher to be used (default is AES-256-CBC)

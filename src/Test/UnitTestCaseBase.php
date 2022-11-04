@@ -8,7 +8,7 @@ namespace QCubed\Test;
  * @was QUnitTestCaseBase
  */
 
-abstract class UnitTestCaseBase extends \PHPUnit_Framework_TestCase
+abstract class UnitTestCaseBase extends \PHPUnit\Framework\TestCase
 {
     /**
      * Given an array of objects $arrObj, verifies that

@@ -65,7 +65,7 @@ abstract class ErrorHandler
      */
     public static function handleException(\Exception $__exc_objException)
     {
-        if (class_exists('\QApplicationBase')) {
+        if (class_exists('\ApplicationBase')) {
             \QApplicationBase::$ErrorFlag = true;
         }
 
@@ -183,7 +183,7 @@ abstract class ErrorHandler
             return true;
         }
 
-        if (class_exists('\QApplicationBase')) {
+        if (class_exists('\ApplicationBase')) {
             \QApplicationBase::$ErrorFlag = true;
         }
 

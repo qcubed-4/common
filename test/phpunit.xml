@@ -2,7 +2,7 @@
          colors="true"
         processIsolation="false">
     <testsuites>
-        <testsuite name="QCubed Common Unit Test">
+        <testsuite name="QCubed-4 Common Unit Test">
             <directory>unit</directory>
         </testsuite>
     </testsuites>
