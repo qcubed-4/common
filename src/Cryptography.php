@@ -96,7 +96,7 @@ class Cryptography extends ObjectBase
             if (!defined('QCUBED_CRYPTOGRAPHY_DEFAULT_KEY')) {
                 throw new \Exception('To use QCubed\\Cryptography, either pass in a key, or define QCUBED_CRYPTOGRAPHY_DEFAULT_KEY in your config file');
             }
-            $this->strKey = QCRYPTOGRAPHY_DEFAULT_KEY;
+            $this->strKey = QCUBED_CRYPTOGRAPHY_DEFAULT_KEY;
         } else {
             $this->strKey = $strKey;
         }
