@@ -428,19 +428,6 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
             }
         }
 
-        /*
-            (?(?=D)([D]+)|
-                (?(?=M)([M]+)|
-                    (?(?=Y)([Y]+)|
-                        (?(?=h)([h]+)|
-                            (?(?=m)([m]+)|
-                                (?(?=s)([s]+)|
-                                    (?(?=z)([z]+)|
-                                        (?(?=t)([t]+)|
-            ))))))))
-        */
-
-//			$strArray = preg_split('/([^D^M^Y^h^m^s^z^t])+/', $strFormat);
         preg_match_all('/(?(?=D)([D]+)|(?(?=M)([M]+)|(?(?=Y)([Y]+)|(?(?=h)([h]+)|(?(?=m)([m]+)|(?(?=s)([s]+)|(?(?=z)([z]+)|(?(?=t)([t]+)|))))))))/',
             $strFormat, $strArray);
         $strArray = $strArray[0];
@@ -556,18 +543,18 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      * @param int|null $intMicroSeconds
      * @return $this
      */
-    public function setTime($mixValue, $intMinute = null, $intSecond = null, $intMicroSeconds = null)
+    public function setTime($mixValue, $intMinute = null, $intSecond = null, $intMicroSeconds = null): \DateTime
     {
+        // Check if $mixValue is a QDateTime object
         if ($mixValue instanceof QDateTime) {
             if ($mixValue->isTimeNull()) {
                 $this->blnTimeNull = true;
                 $this->reinforceNullProperties();
                 return $this;
             }
-            // normalize the timezones
+            // Normalize time zones
             $tz = $this->getTimezone();
             if ($tz && in_array($tz->getName(), timezone_identifiers_list())) {
-                // php limits you to ID only timezones here, so make sure we have one of those
                 $mixValue->setTimezone($tz);
             }
             $intHour = $mixValue->Hour;
@@ -576,8 +563,10 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
         } else {
             $intHour = $mixValue;
         }
-        // If HOUR or MINUTE is NULL...
+
+        // If HOUR or MINUTE is NULL
         if (is_null($intHour) || is_null($intMinute)) {
+            $intMicroSeconds = $intMicroSeconds ?? 0;
             if (version_compare(PHP_VERSION, '7.2.0', '>=')) {
                 parent::setTime($intHour, $intMinute, $intSecond, $intMicroSeconds);
             } else {
@@ -588,21 +577,14 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
             return $this;
         }
 
+        // Convert and set values
         $intHour = Type::cast($intHour, Type::INTEGER);
         $intMinute = Type::cast($intMinute, Type::INTEGER);
         $intSecond = Type::cast($intSecond, Type::INTEGER);
+        $intMicroSeconds = $intMicroSeconds ?? 0;
         $this->blnTimeNull = false;
 
-        /*
-        // Possible fix for a PHP problem. Can't reproduce, so leaving code here just in case it comes back.
-        // The problem is with setting times across dst barriers
-        if ($this->Hour == 0 && preg_match('/[0-9]+/', $this->getTimezone()->getName())) {
-            // fix a php problem with GMT and relative timezones
-            $s = 'PT' . $intHour . 'H' . $intMinute . 'M' . $intSecond . 'S';
-            $this->add (new DateInterval ($s));
-            // will continue and set again to make sure, because boundary crossing will change the time
-        }*/
-
+        // Setting the time
         if (version_compare(PHP_VERSION, '7.2.0', '>=')) {
             parent::setTime($intHour, $intMinute, $intSecond, $intMicroSeconds);
         } else {
@@ -620,13 +602,18 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      * @param int $intDay
      * @return $this|QDateTime
      */
-    public function setDate($intYear, $intMonth, $intDay)
+    public function setDate(int $intYear, int $intMonth, int $intDay): \DateTime
     {
+        // Turvaliised tüüpi muutmised
         $intYear = Type::cast($intYear, Type::INTEGER);
         $intMonth = Type::cast($intMonth, Type::INTEGER);
         $intDay = Type::cast($intDay, Type::INTEGER);
         $this->blnDateNull = false;
+
+        // Tell the parent to execute its version of this method
         parent::setDate($intYear, $intMonth, $intDay);
+
+        // Return the current object to satisfy method chaining
         return $this;
     }
 
@@ -945,7 +932,7 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      * @param string $mixValue
      * @return QDateTime
      */
-    public function modify($mixValue)
+    public function modify(string $mixValue): \DateTime
     {
         parent::modify($mixValue);
         return $this;
@@ -981,7 +968,7 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      *
      * @return array|mixed;
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         if ($this->blnDateNull) {
             $dt = self::now();    // time only will use today's date.
@@ -1204,88 +1191,3 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
 }
 
 \DateTime::RFC1123;
-/*
-This is a reference to the documentation for hte PHP DateTime classes (as of PHP 5.2)
-
-  DateTime::ATOM
-  DateTime::COOKIE
-  DateTime::ISO8601
-  DateTime::RFC822
-  DateTime::RFC850
-  DateTime::RFC1036
-  DateTime::RFC1123
-  DateTime::RFC2822
-  DateTime::RFC3339
-  DateTime::RSS
-  DateTime::W3C
-
-  DateTime::__construct([string time[, DateTimeZone object]])
-  - Returns new DateTime object
-
-  string DateTime::format(string format)
-  - Returns date formatted according to given format
-
-  long DateTime::getOffset()
-  - Returns the DST offset
-
-  DateTimeZone DateTime::getTimezone()
-  - Return new DateTimeZone object relative to give DateTime
-
-  void DateTime::modify(string modify)
-  - Alters the timestamp
-
-  array DateTime::parse(string date)
-  - Returns associative array with detailed info about given date
-
-  void DateTime::setDate(long year, long month, long day)
-  - Sets the date
-
-  void DateTime::setISODate(long year, long week[, long day])
-  - Sets the ISO date
-
-  void DateTime::setTime(long hour, long minute[, long second])
-  - Sets the time
-
-  void DateTime::setTimezone(DateTimeZone object)
-  - Sets the timezone for the DateTime object
-*/
-
-/* Some quick and dirty test harnesses
-$dtt1 = new QDateTime();
-$dtt2 = new QDateTime();
-printTable($dtt1, $dtt2);
-$dtt2->setDate(2000, 1, 1);
-$dtt1->setTime(0,0,3);
-$dtt2->setTime(0,0,2);
-//	$dtt2->Month++;
-printTable($dtt1, $dtt2);
-
-function printTable($dtt1, $dtt2) {
-    print('<table border="1" cellpadding="2"><tr><td>');
-    printDate($dtt1);
-    print('</td><td>');
-    printDate($dtt2);
-    print ('</td></tr>');
-
-    print ('<tr><td colspan="2" align="center">IsEqualTo: <b>' . (($dtt1->isEqualTo($dtt2)) ? 'Yes' : 'No') . '</b></td></tr>');
-    print ('<tr><td colspan="2" align="center">IsEarlierThan: <b>' . (($dtt1->isEarlierThan($dtt2)) ? 'Yes' : 'No') . '</b></td></tr>');
-    print ('<tr><td colspan="2" align="center">IsLaterThan: <b>' . (($dtt1->isLaterThan($dtt2)) ? 'Yes' : 'No') . '</b></td></tr>');
-    print ('<tr><td colspan="2" align="center">IsEarlierOrEqualTo: <b>' . (($dtt1->isEarlierOrEqualTo($dtt2)) ? 'Yes' : 'No') . '</b></td></tr>');
-    print ('<tr><td colspan="2" align="center">IsLaterOrEqualTo: <b>' . (($dtt1->isLaterOrEqualTo($dtt2)) ? 'Yes' : 'No') . '</b></td></tr>');
-    print('</table>');
-}
-
-function printDate($dtt) {
-    print ('Time Null: ' . (($dtt->isTimeNull()) ? 'Yes' : 'No'));
-    print ('<br/>');
-    print ('Date Null: ' . (($dtt->isDateNull()) ? 'Yes' : 'No'));
-    print ('<br/>');
-    print ('Date: ' . $dtt->qFormat(QDateTime::FormatDisplayDateTimeFull));
-    print ('<br/>');
-    print ('Month: ' . $dtt->Month . '<br/>');
-    print ('Day: ' . $dtt->Day . '<br/>');
-    print ('Year: ' . $dtt->Year . '<br/>');
-    print ('Hour: ' . $dtt->Hour . '<br/>');
-    print ('Minute: ' . $dtt->Minute . '<br/>');
-    print ('Second: ' . $dtt->Second . '<br/>');
-}*/

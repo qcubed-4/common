@@ -50,7 +50,7 @@ class Closure implements \JsonSerializable
      * Converts the object into something serializable by json_encode. Will get decoded in qcubed.unpackObj
      * @return mixed
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         // Encode in a way to decode in qcubed.js
         $a[Helper::JSON_OBJECT_TYPE] = 'qClosure';

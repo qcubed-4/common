@@ -17,7 +17,7 @@
  * Tries to accomplish as much as possible without calling into the QCubed framework, since we are in an error state.
  */
 
-$__exc_strMessageBody = htmlentities($__exc_strMessage, null, null, false);
+$__exc_strMessageBody = htmlentities($__exc_strMessage, ENT_QUOTES, 'UTF-8', false);
 $__exc_strMessageBody = str_replace(" ", "&nbsp;", str_replace("\n", "<br/>\n", $__exc_strMessageBody));
 $__exc_strMessageBody = str_replace(":&nbsp;", ": ", $__exc_strMessageBody);
 

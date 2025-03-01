@@ -66,7 +66,7 @@ class Func implements \JsonSerializable
      * Returns this as a json object to be sent to qcubed.js during ajax drawing.
      * @return mixed
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         $a[Helper::JSON_OBJECT_TYPE] = 'qFunc';
         $a['func'] = $this->strFunctionName;

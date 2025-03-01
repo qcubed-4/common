@@ -30,7 +30,7 @@ class VarName implements \JsonSerializable
         return $this->strContent;
     }
 
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         $a[Helper::JSON_OBJECT_TYPE] = 'qVarName';
         $a['varName'] = $this->strContent;
