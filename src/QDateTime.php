@@ -193,7 +193,7 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      * @param \DateTimeZone $objTimeZone
      * @return QDateTime
      */
-    public static function fromTimestamp($intTimestamp, \DateTimeZone $objTimeZone = null)
+    public static function fromTimestamp($intTimestamp, ?\DateTimeZone $objTimeZone = null)
     {
         return new QDateTime(date('Y-m-d H:i:s', $intTimestamp), $objTimeZone);
     }
@@ -210,7 +210,7 @@ class QDateTime extends \DateTime implements \JsonSerializable, \Serializable
      *
      * @throws Caller
      */
-    public function __construct($mixValue = null, \DateTimeZone $objTimeZone = null, $intType = QDateTime::UNKNOWN_TYPE)
+    public function __construct($mixValue = null, ?\DateTimeZone $objTimeZone = null, $intType = QDateTime::UNKNOWN_TYPE)
     {
         if ($mixValue instanceof QDateTime) {
             // Cloning from another QDateTime object
