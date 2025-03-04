@@ -26,7 +26,7 @@ class Handler
      * @param callable $func    A callable that will be used temporarily as the function
      * @param null $intLevel
      */
-    public function __construct(callable $func = null, $intLevel = null)
+    public function __construct(?callable $func = null, $intLevel = null)
     {
         if (!$func) {
             // No Error Handling is wanted -- simulate a "On Error, Resume" type of functionality
