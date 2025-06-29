@@ -14,4 +14,7 @@ There are several repositories.
 
 * qcubed-4/common: a collection of classes that are used throughout the different QCubed-4 repositories.
 
-* kukrik/bootstrap: include bootstrap in your QCubed project
+* qcubed/bootstrap: include bootstrap in your QCubed project
+
+# old version repositories
+* qcubed/qcubed contains the older versions of qcubed and are no longer in active development.

@@ -9,6 +9,7 @@
 
 namespace QCubed;
 
+use QCubed as Q;
 use QCubed\Exception\Caller;
 use QCubed\Project\Application;
 
@@ -23,6 +24,7 @@ abstract class QString
 {
     const LETTERS_NUMBERS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const LETTERS_NUMBERS_SYMBOLS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}/?><,.;:~';
+    private static ?string $qcubedEncoding = null;
 
     /**
      * Constructs the class but is intentionally designed to prevent instantiation.
@@ -161,9 +163,8 @@ abstract class QString
         // Check for special characters in the string
         if (
             (self::$qcubedEncoding && (mb_strpos($strString, '<', 0, self::$qcubedEncoding) !== false || mb_strpos($strString, '&', 0, self::$qcubedEncoding) !== false)) ||
-            (!$self::$qcubedEncoding && (strpos($strString, '<') !== false || strpos($strString, '&') !== false))
+            (!self::$qcubedEncoding && (str_contains($strString, '<') || str_contains($strString, '&')))
         ) {
-            // Replace instances of ']]>' with the escaped version within CDATA
             $strString = str_replace(']]>', ']]]]><![CDATA[>', $strString);
             // Wrap the entire string in a CDATA section
             $strString = sprintf('<![CDATA[%s]]>', $strString);
@@ -374,7 +375,7 @@ abstract class QString
             | \xF0[\x90-\xBF][\x80-\xBF]{2}     # planes 1-3
             | [\xF1-\xF3][\x80-\xBF]{3}         # planes 4-15
             | \xF4[\x80-\x8F][\x80-\xBF]{2}     # plane 16
-        )*$%xs', $strString) === 1);
+        )*$%x', $strString) === 1);
     }
 
     /**
@@ -383,17 +384,19 @@ abstract class QString
      * @param int $intLength The desired length of the random string. Must be greater than 0.
      * @param string $strCharacterSet The set of characters to use for generating the random string.
      *                                Defaults to a pre-defined set of letters and numbers.
+     *
      * @return string A random string of the specified length generated from the given character set.
-     * @throws InvalidArgumentException If the specified length is less than 1 or the character set is empty.
+     * @throws Caller If the specified length is less than 1 or the character set is empty.*@throws
+     *     \QCubed\Exception\Caller
      */
     public static function getRandomString(int $intLength, string $strCharacterSet = self::LETTERS_NUMBERS): string
     {
         if ($intLength < 1) {
-            throw new InvalidArgumentException('Cannot generate a random string of zero length.');
+            throw new Caller('Cannot generate a random string of zero lengths.');
         }
 
         if (trim($strCharacterSet) === '') {
-            throw new InvalidArgumentException('Character set must contain at least 1 printable character.');
+            throw new Caller('Character set must contain at least 1 printable character.');
         }
 
         return substr(
@@ -420,7 +423,7 @@ abstract class QString
     /**
      * Converts a camel case formatted string into a space-separated string of words.
      *
-     * @param string $strName The camel case string to be converted.
+     * @param string $strName The camel case strings to be converted.
      * @return string A space-separated string of words derived from the camel case input.
      */
     public static function wordsFromCamelCase(string $strName): string
@@ -462,7 +465,7 @@ abstract class QString
      * Converts a snake_case string to camelCase by removing underscores and capitalizing
      * the first letter of each word after an underscore.
      *
-     * @param string $strName The snake_case string to be converted.
+     * @param string $strName The snake case strings to be converted.
      * @return string The resulting camelCase string.
      */
     public static function camelCaseFromUnderscore(string $strName): string
@@ -476,7 +479,7 @@ abstract class QString
     }
 
     /**
-     * Converts a string from underscore_case to Java-style camelCase,
+     * Converts a string from underscore case to Java-style camelCase,
      * ensuring the first letter of the resulting string is lowercase.
      *
      * @param string $strName The input string in underscore_case format.
@@ -518,7 +521,7 @@ abstract class QString
     public static function generateQueryString(?array $arr = null): string
     {
         $arr = $arr ?? $_GET;
-        return ($arr && !empty($arr)) ? '?' . http_build_query($arr) : '';
+        return (!empty($arr)) ? '?' . http_build_query($arr) : '';
     }
 
     /**
@@ -527,7 +530,7 @@ abstract class QString
      * @param mixed $strVal The value to be checked.
      * @return bool True if the value is an integer, otherwise false.
      */
-    public static function isInteger($strVal): bool
+    public static function isInteger(mixed $strVal): bool
     {
         return is_numeric($strVal) && ctype_digit((string) $strVal);
     }
@@ -556,5 +559,46 @@ abstract class QString
         $size = $intSize / pow(1024, $base);
 
         return round($size, max(0, $intPrecision)) . ' ' . $suffixes[$base];
+    }
+
+    /**
+     * Obfuscates an email so that it can be outputted as HTML to the page.
+     * @param string $strEmail the email address to obfuscate
+     * @return string the HTML of the obfuscated Email address
+     */
+    public  static function obfuscateEmail(string $strEmail): string {
+        $strEmail = QString::htmlEntities($strEmail);
+        $strEmail = str_replace('@', '<strong style="display: none;">' . md5(microtime()) . '</strong>&#064;<strong style="display: none;">' . md5(microtime()) . '</strong>', $strEmail);
+        return str_replace('.', '<strong style="display: none;">' . md5(microtime()) . '</strong>&#046;<strong style="display: none;">' . md5(microtime()) . '</strong>', $strEmail);
+    }
+
+    /**
+     * Renders an obfuscated email link and generates the necessary JavaScript to decode
+     * and display it on the client-side upon a page load.
+     *
+     * @param string $email The email address to be obfuscated and rendered.
+     * @param string|null $controlId Optional control ID to be used for the anchor element.
+     *                               If not provided, a unique ID will be generated.
+     * @return string The HTML anchor element with the obfuscated email, ready to be decoded and displayed.
+     * @throws Caller
+     */
+    public static function renderObfuscatedEmail(string $email, ?string $controlId = null): string
+    {
+        $encodedEmail = self::base64UrlSafeEncode($email);
+        $id = $controlId ?: 'obf_email_' . uniqid();
+
+        $js = <<<EOT
+        document.addEventListener("DOMContentLoaded", function() {
+            var element = document.getElementById("$id");
+            if (element) {
+                var decodedEmail = atob("$encodedEmail".replace(/-/g, '+').replace(/_/g, '/'));
+                element.href = "mailto:" + decodedEmail;
+                element.textContent = decodedEmail;
+            }
+        })
+    EOT;
+        Application::executeJavaScript($js, Q\ApplicationBase::PRIORITY_HIGH);
+
+        return "<a href='#' id='$id' rel='nofollow noopener noreferrer'></a>";
     }
 }

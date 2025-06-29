@@ -9,7 +9,7 @@
 namespace QCubed\Exception;
 
 /**
- * Thrown when a particular property of class is not defined and we try to access it
+ * Thrown when a particular property of class is not defined, and we try to access it
  * @was QInvalidArgumentException
  */
 class InvalidArgument extends Caller
@@ -20,7 +20,7 @@ class InvalidArgument extends Caller
      * @param int $strClass
      * @param string $strProperty
      */
-    public function __construct($strType, $strClass, $strProperty)
+    public function __construct(string $strType, int $strClass, string $strProperty)
     {
         parent::__construct(sprintf("Invalid argument '%s' in '%s' class: %s", $strProperty,
             $strType, $strClass), 2);

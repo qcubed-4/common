@@ -20,8 +20,8 @@ class QCubed
 {
 
     // Constants coordinating with qcubed.js
-    const JSON_OBJECT_TYPE = 'qObjType';    // Indicates a PHP object we are serializing through the JsonSerialize interface
+    const string JSON_OBJECT_TYPE = 'qObjType';    // Indicates a PHP object we are serializing through the JsonSerialize interface
 
     // Database constants
-    const NAMED_VALUE_DELIMITER = 3;
+    const int NAMED_VALUE_DELIMITER = 3;
 }

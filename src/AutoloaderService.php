@@ -10,11 +10,14 @@
 
 namespace QCubed;
 
+use Composer\Autoload\ClassLoader;
+use Exception;
+
 /**
  * Class Autoloader
  *
- * This is a kind of autoloader helper class. It is meant to be a partner class to the composer autoloader, but it
- * can stand alone as well without composer.
+ * This is a kind of helper class for the autoloader. It is intended to be a companion class for the composer autoloader, but it
+ * can also stand alone without the composer.
  *
  * Since composer has an autoloader, why do we need a new one?
  * 1) Composer's autoloader is great for development, but in production, you can get faster performance by having composer
@@ -27,22 +30,24 @@ namespace QCubed;
  */
 class AutoloaderService
 {
-    /** @var  AutoloaderService the singleton service for this autoloader */
-    protected static $instance;
+    /** @var  AutoloaderService|null the singleton service for this autoloader */
+    protected static AutoloaderService|null $instance = null;
 
     /** @var bool */
-    protected $blnInitialized = false;
-    /** @var  \Composer\Autoload\ClassLoader */
-    protected $composerAutoloader;
+    protected ?bool $blnInitialized = false;
+    /** @var  ClassLoader */
+    protected ClassLoader $composerAutoloader;
     /** @var  array */
-    protected $classmap;
+    protected array $classmap;
 
     /**
      * Retrieve the current singleton, creating a new one if needed.
      *
      * @return AutoloaderService
      */
-    public static function instance()
+
+
+    public static function instance(): AutoloaderService
     {
         if (!static::$instance) {
             static::$instance = new AutoloaderService();
@@ -51,12 +56,12 @@ class AutoloaderService
     }
 
     /**
-     * Initialize the autoloader, passing the composer autoloader path if we are using it.
+     * Initialize the class by setting up the autoloader and optional vendor directory.
      *
-     * @param string|null $strVendorDir Composer autoloader path (Optional)
-     * @return $this
+     * @param string|null $strVendorDir The path to the vendor directory containing the composer autoloader. If null, skip composer autoloader setup.
+     * @throws \Exception If the composer autoloader file is not found in the provided vendor directory.
      */
-    public function initialize($strVendorDir = null)
+    public function initialize(?string $strVendorDir = null): static
     {
         $this->blnInitialized = true;
         $this->classmap = [];
@@ -66,12 +71,12 @@ class AutoloaderService
                 $this->composerAutoloader = require($strComposerAutoloadPath);
             }
             else {
-                throw new \Exception('Cannot find composer autoloader');
+                throw new Exception('Cannot find composer autoloader');
             }
         }
 
         // Register our autoloader, making sure we go after the composer autoloader
-        spl_autoload_register(array($this, 'autoload'), true, false);
+        spl_autoload_register(array($this, 'autoload'));
         return $this;
     }
 
@@ -82,30 +87,31 @@ class AutoloaderService
      * @param array $classmap
      * @return $this
      */
-    public function addClassmap($classmap)
+    public function addClassmap(array $classmap): static
     {
         $this->classmap = array_merge($this->classmap, $classmap);
         return $this;
     }
 
     /**
-     * Add a php file that returns a classmap.
+     * Add a PHP file that returns a classmap.
      *
      * @param string $strPath
      * @return $this
      */
-    public function addClassmapFile($strPath)
+    public function addClassmapFile(string $strPath): static
     {
         $this->classmap = array_merge($this->classmap, include($strPath));
         return $this;
     }
 
     /**
-     * Our autoload function. Not meant for public consumption. Gets called by the system.
-     * @param $strClassName
-     * @return bool
+     * Autoload a class using the classmap if the class exists in it.
+     *
+     * @param string $strClassName The name of the class to be autoloader.
+     * @return bool True if the class was successfully loaded, false otherwise.
      */
-    public function autoload($strClassName)
+    public function autoload(string $strClassName): bool
     {
         $strClassName = strtolower($strClassName);
         if (!empty($this->classmap[$strClassName])) {
@@ -127,28 +133,21 @@ class AutoloaderService
      * @param string $strPath
      * @return $this
      */
-    public function addPsr4($strPrefix, $strPath)
+    public function addPsr4(string $strPrefix, string $strPath): static
     {
-        if ($this->composerAutoloader) {
-            $this->composerAutoloader->addPsr4($strPrefix, $strPath);
-        }
+        $this->composerAutoloader->addPsr4($strPrefix, $strPath);
         return $this;
     }
 
     /**
-     * Given a class, returns the path to the file that contains that class.
+     * Find the file path corresponding to a given class name.
      *
-     * @param $strClass
-     * @return false|mixed|null|string
+     * @param string $strClass The fully qualified class name to locate.
+     * @return string|null The file path of the class if found, or null if not found.
      */
-    public function findFile($strClass)
+    public function findFile(string $strClass): ?string
     {
-        if (isset($this->classmap[$strClass])) {
-            $strFile = $this->classmap[$strClass];
-        }
-        else {
-            $strFile = $this->composerAutoloader->findFile($strClass);
-        }
+        $strFile = $this->classmap[$strClass] ?? $this->composerAutoloader->findFile($strClass);
 
         if ($strFile && file_exists($strFile)) {
             return $strFile;

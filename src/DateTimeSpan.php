@@ -10,6 +10,8 @@
 namespace QCubed;
 
 use QCubed\Exception\Caller;
+use QCubed\Exception\InvalidCast;
+use Exception;
 
 require_once (dirname(__DIR__) . '/i18n/i18n-lib.inc.php');
 
@@ -21,54 +23,49 @@ require_once (dirname(__DIR__) . '/i18n/i18n-lib.inc.php');
  * @property-read int $Days    Days in the calculated timespan
  * @property-read int $Hours   Hours in the calculated timespan
  * @property-read int $Minutes Minutes in the calculated timespan
- * @property int $Seconds Number seconds which correspond to the time difference
- * @was QDateTimeSpan
+ * @property int $Seconds Number of seconds which correspond to the time difference
  */
 class DateTimeSpan extends ObjectBase
 {
-    /** Number of seconds in an year */
-    const SECONDS_PER_YEAR = 31556926;
+    /** Number of seconds in a year */
+    const int SECONDS_PER_YEAR = 31556926;
 
     /* From: http://tycho.usno.navy.mil/leapsec.html:
         This definition was ratified by the Eleventh General Conference on Weights and Measures in 1960.
-        Reference to the year 1900  does not mean that this is the epoch of a mean solar day of 86,400 seconds.
+        Reference to the year 1900 does not mean that this is the epoch of a mean solar day of 86,400 seconds.
         Rather, it is the epoch of the tropical year of 31,556,925.9747 seconds of ephemeris time.
         Ephemeris Time (ET) was defined as the measure of time that brings the observed positions of the celestial
         bodies into accord with the Newtonian dynamical theory of motion.
     */
     /** Number of seconds in a month (assuming 30 days in a month) */
-    const SECONDS_PER_MONTH = 2592000;
+    const int SECONDS_PER_MONTH = 2592000;
 
     // Assume 30 Days per Month
     /** Number of seconds per day */
-    const SECONDS_PER_DAY = 86400;
+    const int SECONDS_PER_DAY = 86400;
     /** Number of seconds in an hour */
-    const SECONDS_PER_HOUR = 3600;
+    const int SECONDS_PER_HOUR = 3600;
     /** Number of seconds per minute */
-    const SECONDS_PER_MINUTE = 60;
-    /** @var int Seconds variable which will be used to calculate the timespan */
-    protected $intSeconds;
+    const int SECONDS_PER_MINUTE = 60;
+    /** @var int Seconds variable, which will be used to calculate the timespan */
+    protected int $intSeconds;
 
     /**
      * Constructor for the DateTimeSpan class
      *
      * @param int $intSeconds Number of seconds to set for this DateTimeSpan
      */
-    public function __construct($intSeconds = 0)
+    public function __construct(int $intSeconds = 0)
     {
         $this->intSeconds = $intSeconds;
     }
-
-    /*
-        Is functions
-    */
 
     /**
      * Checks if the current DateSpan is zero
      *
      * @return boolean
      */
-    public function isZero()
+    public function isZero(): bool
     {
         return ($this->intSeconds == 0);
     }
@@ -79,7 +76,7 @@ class DateTimeSpan extends ObjectBase
      * @param DateTimeSpan $dtsSpan
      * @return DateTimeSpan
      */
-    public function difference(DateTimeSpan $dtsSpan)
+    public function difference(DateTimeSpan $dtsSpan): DateTimeSpan
     {
         $intDifference = $this->Seconds - $dtsSpan->Seconds;
         $dtsDateSpan = new DateTimeSpan();
@@ -88,11 +85,11 @@ class DateTimeSpan extends ObjectBase
     }
 
     /**
-     * Adds an amount of seconds to the current DateTimeSpan
+     * Adds a number of seconds to the current DateTimeSpan
      *
      * @param int $intSeconds
      */
-    public function addSeconds($intSeconds)
+    public function addSeconds(int $intSeconds): void
     {
         $this->intSeconds = $this->intSeconds + $intSeconds;
     }
@@ -103,92 +100,80 @@ class DateTimeSpan extends ObjectBase
      * @param QDateTime $dttFrom
      * @param QDateTime $dttTo
      */
-    public function setFromQDateTime(QDateTime $dttFrom, QDateTime $dttTo)
+    public function setFromQDateTime(QDateTime $dttFrom, QDateTime $dttTo): void
     {
         $this->add($dttFrom->difference($dttTo));
     }
 
-    /*
-        SetFrom methods
-    */
-
     /**
-     * Adds a DateTimeSpan to current DateTimeSpan
+     * Adds a DateTimeSpan to the current DateTimeSpan
      *
      * @param DateTimeSpan $dtsSpan
      */
-    public function add(DateTimeSpan $dtsSpan)
+    public function add(DateTimeSpan $dtsSpan): void
     {
         $this->intSeconds = $this->intSeconds + $dtsSpan->Seconds;
     }
 
-    /*
-        Add methods
-    */
-
     /**
-     * Adds an amount of minutes to the current DateTimeSpan
+     * Adds a number of minutes to the current DateTimeSpan
      *
      * @param int $intMinutes
      */
-    public function addMinutes($intMinutes)
+    public function addMinutes(int $intMinutes): void
     {
         $this->intSeconds = $this->intSeconds + ($intMinutes * DateTimeSpan::SECONDS_PER_MINUTE);
     }
 
     /**
-     * Adds an amount of hours to the current DateTimeSpan
+     * Adds a number of hours to the current DateTimeSpan
      *
      * @param int $intHours
      */
-    public function addHours($intHours)
+    public function addHours(int $intHours): void
     {
         $this->intSeconds = $this->intSeconds + ($intHours * DateTimeSpan::SECONDS_PER_HOUR);
     }
 
     /**
-     * Adds an amount of days to the current DateTimeSpan
+     * Adds a number of days to the current DateTimeSpan
      *
      * @param int $intDays
      */
-    public function addDays($intDays)
+    public function addDays(int $intDays): void
     {
         $this->intSeconds = $this->intSeconds + ($intDays * DateTimeSpan::SECONDS_PER_DAY);
     }
 
     /**
-     * Adds an amount of months to the current DateTimeSpan
+     * Adds a number of months to the current DateTimeSpan
      *
      * @param int $intMonths
      */
-    public function addMonths($intMonths)
+    public function addMonths(int $intMonths): void
     {
         $this->intSeconds = $this->intSeconds + ($intMonths * DateTimeSpan::SECONDS_PER_MONTH);
     }
 
     /**
-     * Subtracts a DateTimeSpan to current DateTimeSpan
+     * Subtracts a DateTimeSpan to the current DateTimeSpan
      *
      * @param DateTimeSpan $dtsSpan
      */
-    public function subtract(DateTimeSpan $dtsSpan)
+    public function subtract(DateTimeSpan $dtsSpan): void
     {
         $this->intSeconds = $this->intSeconds - $dtsSpan->Seconds;
     }
 
-    /*
-        Get methods
-    */
-
     /**
-     * Returns the time difference in approximate duration
+     * Returns the time difference in approximate duration,
      * e.g. "about 4 months" or "4 minutes"
      *
      * The QDateTime class uses this function in its 'Age' property accessor
      *
      * @return null|string
      */
-    public function simpleDisplay()
+    public function simpleDisplay(): ?string
     {
         $arrTimearray = $this->getTimearray();
         $strToReturn = null;
@@ -217,11 +202,11 @@ class DateTimeSpan extends ObjectBase
     }
 
     /**
-     * Return an array of timeunints
+     * Return an array of timeunits
      *
      * @return array of timeunits
      */
-    protected function getTimearray()
+    protected function getTimearray(): array
     {
         $intSeconds = abs($this->intSeconds);
 
@@ -265,7 +250,7 @@ class DateTimeSpan extends ObjectBase
      *
      * @return boolean
      */
-    public function isNegative()
+    public function isNegative(): bool
     {
         return ($this->intSeconds < 0);
     }
@@ -278,10 +263,10 @@ class DateTimeSpan extends ObjectBase
      * @param string $strName Name of the property to get
      *
      * @return mixed the returned property
-     * @throws \Exception|Caller
+     * @throws Exception
      */
 
-    public function __get($strName)
+    public function __get(string $strName): mixed
     {
         switch ($strName) {
             case 'Years':
@@ -309,26 +294,27 @@ class DateTimeSpan extends ObjectBase
         }
     }
 
-    /**
-     * Override method to perform a property "Set"
-     * This will set the property $strName to be $mixValue
-     * PHP magic method
-     *
-     * @param string $strName Name of the property to set
-     * @param string $mixValue New value of the property
-     *
-     * @return mixed the property that was set
-     * @throws \Exception|Caller
-     */
 
-    public function __set($strName, $mixValue)
+    /**
+     * Sets the value of a property.
+     *
+     * @param string $strName The name of the property.
+     * @param mixed $mixValue The value to set for the property.
+     *
+     * @return void Returns the value assigned to the property.
+     * @throws Caller If the property name is invalid.
+     * @throws InvalidCast
+     * @throws Exception
+     */
+    public function __set(string $strName, mixed $mixValue): void
     {
         try {
             switch ($strName) {
                 case 'Seconds':
-                    return ($this->intSeconds = Type::cast($mixValue, Type::INTEGER));
+                    $this->intSeconds = Type::cast($mixValue, Type::INTEGER);
+                    break;
                 default:
-                    return (parent::__set($strName, $mixValue));
+                    parent::__set($strName, $mixValue);
             }
         } catch (Caller $objExc) {
             $objExc->incrementOffset();
@@ -336,16 +322,12 @@ class DateTimeSpan extends ObjectBase
         }
     }
 
-    /*
-        DateMathSettings
-    */
-
     /**
      * Calculates the total whole years in the current DateTimeSpan
      *
-     * @return int
+     * @return float|int
      */
-    protected function getYears()
+    protected function getYears(): float|int
     {
         $intSecondsPerYear = ($this->isPositive()) ? DateTimeSpan::SECONDS_PER_YEAR : ((-1) * DateTimeSpan::SECONDS_PER_YEAR);
         $intYears = floor($this->intSeconds / $intSecondsPerYear);
@@ -360,7 +342,7 @@ class DateTimeSpan extends ObjectBase
      *
      * @return boolean
      */
-    public function isPositive()
+    public function isPositive(): bool
     {
         return ($this->intSeconds > 0);
     }
@@ -368,9 +350,9 @@ class DateTimeSpan extends ObjectBase
     /**
      * Calculates the total whole months in the current DateTimeSpan
      *
-     * @return int
+     * @return float|int
      */
-    protected function getMonths()
+    protected function getMonths(): float|int
     {
         $intSecondsPerMonth = ($this->isPositive()) ? DateTimeSpan::SECONDS_PER_MONTH : ((-1) * DateTimeSpan::SECONDS_PER_MONTH);
         $intMonths = floor($this->intSeconds / $intSecondsPerMonth);
@@ -383,9 +365,9 @@ class DateTimeSpan extends ObjectBase
     /**
      * Calculates the total whole days in the current DateTimeSpan
      *
-     * @return int
+     * @return float|int
      */
-    protected function getDays()
+    protected function getDays(): float|int
     {
         $intSecondsPerDay = ($this->isPositive()) ? DateTimeSpan::SECONDS_PER_DAY : ((-1) * DateTimeSpan::SECONDS_PER_DAY);
         $intDays = floor($this->intSeconds / $intSecondsPerDay);
@@ -398,9 +380,9 @@ class DateTimeSpan extends ObjectBase
     /**
      * Calculates the total whole hours in the current DateTimeSpan
      *
-     * @return int
+     * @return float|int
      */
-    protected function getHours()
+    protected function getHours(): float|int
     {
         $intSecondsPerHour = ($this->isPositive()) ? DateTimeSpan::SECONDS_PER_HOUR : ((-1) * DateTimeSpan::SECONDS_PER_HOUR);
         $intHours = floor($this->intSeconds / $intSecondsPerHour);
@@ -413,9 +395,9 @@ class DateTimeSpan extends ObjectBase
     /**
      * Calculates the total whole minutes in the current DateTimeSpan
      *
-     * @return int
+     * @return float|int
      */
-    protected function getMinutes()
+    protected function getMinutes(): float|int
     {
         $intSecondsPerMinute = ($this->isPositive()) ? DateTimeSpan::SECONDS_PER_MINUTE : ((-1) * DateTimeSpan::SECONDS_PER_MINUTE);
         $intMinutes = floor($this->intSeconds / $intSecondsPerMinute);

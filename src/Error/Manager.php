@@ -1,35 +1,41 @@
 <?php
-/**
- *
- * Part of the QCubed PHP framework.
- *
- * @license MIT
- *
- */
+    /**
+     *
+     */
 
 namespace QCubed\Error;
 
+use QCubed\Exception\DataBind;
+use QCubed\Timer;
+use QCubed\ErrorAttribute;
+use Throwable;
+use ReflectionObject;
+
 class Manager
 {
-    /** @var bool */
-    protected static $errorFlag = false; // indicates an error occurred
+    protected static ?bool $errorFlag = false; // indicates an error occurred
 
     /**
-     * @return bool
+     * Checks if an error condition is currently set.
+     *
+     * @return bool Returns true if the error flag is set, false otherwise.
      */
-    public static function isError() {
+    public static function isError(): bool
+    {
         return static::$errorFlag;
     }
 
+
     /**
      * Set Error/Exception Handling to the default
-     * QCubed HandleError and HandlException functions
-     * (Only in non CLI mode)
+     * QCubed HandleError and HandleException functions
+     * (Only in non-CLI mode)
      *
      * Feel free to change, if needed, to your own
      * custom error handling script(s).
      */
-    public static function initialize() {
+    public static function initialize(): void
+    {
         if (array_key_exists('SERVER_PROTOCOL', $_SERVER)) {
             set_error_handler(['\\QCubed\\Error\\Manager', 'handleError'], error_reporting());
             set_exception_handler(['\\QCubed\\Error\\Manager', 'handleException']);
@@ -38,18 +44,17 @@ class Manager
     }
 
     /**
-     * QCubed's default error handler. This is used by the Error\Handler class to do error management. You should
-     * not normally need this.
+     * Handles an error based on its severity, providing detailed error information.
+     * Displays the error using a specified error handler and returns a boolean indicating if
+     * the error was handled successfully.
      *
-     * Note:  $__exc_errcontext has been deprecated as of PHP 7.2, so is no longer used.
-     *
-     * @param $errNum
-     * @param $errStr
-     * @param $errFile
-     * @param $errLine
-     * @return bool
+     * @param int $errNum The level of the error raised, e.g., E_WARNING or E_ERROR.
+     * @param string $errStr The error message.
+     * @param string $errFile The filename where the error was raised.
+     * @param int $errLine The line number where the error was raised.
+     * @return bool False if the error is displayed, true if the error is suppressed or already being handled.
      */
-    public static function handleError($errNum, $errStr, $errFile, $errLine)
+    public static function handleError(int $errNum, string $errStr, string $errFile, int $errLine): bool
     {
         // If a command is called with "@", then we should return
         if (error_reporting() == 0) {
@@ -62,56 +67,24 @@ class Manager
             return true; // Already are handling an error. Indicates an additional error condition during error handling
         }
 
-        switch ($errNum) {
-            case E_ERROR:
-                $code = "E_ERROR";
-                break;
-            case E_WARNING:
-                $code = "E_WARNING";
-                break;
-            case E_PARSE:
-                $code = "E_PARSE";
-                break;
-            case E_NOTICE:
-                $code = "E_NOTICE";
-                break;
-            case E_STRICT:
-                $code = "E_STRICT";
-                break;
-            case E_CORE_ERROR:
-                $code = "E_CORE_ERROR";
-                break;
-            case E_CORE_WARNING:
-                $code = "E_CORE_WARNING";
-                break;
-            case E_COMPILE_ERROR:
-                $code = "E_COMPILE_ERROR";
-                break;
-            case E_COMPILE_WARNING:
-                $code = "E_COMPILE_WARNING";
-                break;
-            case E_USER_ERROR:
-                $code = "E_USER_ERROR";
-                break;
-            case E_USER_WARNING:
-                $code = "E_USER_WARNING";
-                break;
-            case E_USER_NOTICE:
-                $code = "E_USER_NOTICE";
-                break;
-            case E_DEPRECATED:
-                $code = 'E_DEPRECATED';
-                break;
-            case E_USER_DEPRECATED:
-                $code = 'E_USER_DEPRECATED';
-                break;
-            case E_RECOVERABLE_ERROR:
-                $code = 'E_RECOVERABLE_ERROR';
-                break;
-            default:
-                $code = "Unknown";
-                break;
-        }
+        $code = match ($errNum) {
+            E_ERROR => "E_ERROR",
+            E_WARNING => "E_WARNING",
+            E_PARSE => "E_PARSE",
+            E_NOTICE => "E_NOTICE",
+            E_STRICT => "E_STRICT",
+            E_CORE_ERROR => "E_CORE_ERROR",
+            E_CORE_WARNING => "E_CORE_WARNING",
+            E_COMPILE_ERROR => "E_COMPILE_ERROR",
+            E_COMPILE_WARNING => "E_COMPILE_WARNING",
+            E_USER_ERROR => "E_USER_ERROR",
+            E_USER_WARNING => "E_USER_WARNING",
+            E_USER_NOTICE => "E_USER_NOTICE",
+            E_DEPRECATED => 'E_DEPRECATED',
+            E_USER_DEPRECATED => 'E_USER_DEPRECATED',
+            E_RECOVERABLE_ERROR => 'E_RECOVERABLE_ERROR',
+            default => "Unknown",
+        };
 
         static::displayError(
             "Error",
@@ -121,23 +94,24 @@ class Manager
             $errFile,
             $errLine,
             self::getBacktrace(),
-            null
+            (array)null
         );
         return false;
     }
 
     /**
-     * Returns a stringified version of a backtrace.
+     * Returns a stringifies version of a backtrace.
      * Set $blnShowArgs if you want to see a representation of the arguments. Note that if you are sending
      * in objects, this will unpack the entire structure and display its contents.
      * $intSkipTraces is how many back traces you want to skip. Set this to at least one to skip the
      * calling of this function itself.
      *
-     * @param bool $blnShowArgs
-     * @param int $intSkipTraces
-     * @return string
+     * @param bool $blnShowArgs Determines whether to include function arguments in the backtrace. Defaults to false.
+     * @param int $intSkipTraces Specifies the number of backtrace entries to skip from the start. Defaults to 1.
+     * @return string A formatted string representation of the backtrace, including a file, line, class, type, function, and arguments (if enabled).
      */
-    public static function getBacktrace($blnShowArgs = false, $intSkipTraces = 1) {
+    public static function getBacktrace(?bool $blnShowArgs = false, int $intSkipTraces = 1): string
+    {
         if (!$blnShowArgs) {
             $b = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
         } else {
@@ -174,7 +148,17 @@ class Manager
         return $strRet;
     }
 
-    public static function handleException($__exc_objException)
+/**
+* Handles an exception or error by extracting its details and displaying an error message.
+* Prevents recursive error handling by ensuring it is invoked only once per error occurrence.
+*
+* @param Throwable $__exc_objException The exception or error object to be handled.
+*                                       Extract information such as error number, message,
+*                                       filename, line number, stack trace, and additional attributes if applicable.
+*
+* @return void This method does not return any value. It processes and displays error details.
+*/
+    public static function handleException(Throwable $__exc_objException): void
     {
         if (!self::$errorFlag) {
             self::$errorFlag = true;
@@ -184,31 +168,23 @@ class Manager
 
         global $__exc_strType;
         if (isset($__exc_strType)) {
-            return;
-        } // error was already called, avoid endless looping
+            return; // Error was already called, avoid endless looping
+        }
 
-        $__exc_objReflection = new \ReflectionObject($__exc_objException);
+        $__exc_objReflection = new ReflectionObject($__exc_objException);
 
-        $__exc_strType = "Exception";
-        $__exc_errno = $__exc_objException->ErrorNumber;
+        $__exc_strType = "Throwable"; // Accepts both Exception and Error
+        $__exc_errno = property_exists($__exc_objException, 'ErrorNumber')
+            ? $__exc_objException->ErrorNumber
+            : 0;
         $__exc_strMessage = $__exc_objException->getMessage();
         $__exc_strObjectType = $__exc_objReflection->getName();
 
         $__exc_objErrorAttributeArray = [];
 
-        if ($__exc_objException instanceof \QCubed\Database\Exception\Base) {
-            $__exc_objErrorAttribute = new QErrorAttribute("Database Error Number", $__exc_errno, false);
-            $__exc_objErrorAttributeArray[0] = $__exc_objErrorAttribute;
-
+        if ($__exc_objException instanceof DataBind) {
             if ($__exc_objException->Query) {
-                $__exc_objErrorAttribute = new QErrorAttribute("Query", $__exc_objException->Query, true);
-                $__exc_objErrorAttributeArray[1] = $__exc_objErrorAttribute;
-            }
-        }
-
-        if ($__exc_objException instanceof \QCubed\Exception\DataBind) {
-            if ($__exc_objException->Query) {
-                $__exc_objErrorAttribute = new QErrorAttribute("Query", $__exc_objException->Query, true);
+                $__exc_objErrorAttribute = new ErrorAttribute("Query", $__exc_objException->Query, true);
                 $__exc_objErrorAttributeArray[1] = $__exc_objErrorAttribute;
             }
         }
@@ -217,27 +193,44 @@ class Manager
         $__exc_intLineNumber = $__exc_objException->getLine();
         $__exc_strStackTrace = trim($__exc_objException->getTraceAsString());
 
-        self::displayError($__exc_strType,
+        self::displayError(
+            $__exc_strType,
             $__exc_errno,
             $__exc_strObjectType,
             $__exc_strMessage,
             $__exc_strFilename,
             $__exc_intLineNumber,
             $__exc_strStackTrace,
-            $__exc_objErrorAttributeArray);
+            $__exc_objErrorAttributeArray
+        );
     }
 
+    /**
+     * Handles and displays error messages, including optional rendering of an error page if defined.
+     * Outputs error details and stops script execution upon invocation.
+     *
+     * @param string $__exc_strType The type of the error, such as 'Fatal', 'Warning', or 'Notice'.
+     * @param int $__exc_errno The error code or number associated with the error.
+     * @param string $__exc_strObjectType The type of object that caused the error, if applicable.
+     * @param string $__exc_strMessage The detailed error message describing the issue.
+     * @param string $__exc_strFilename The name of the file in which the error occurred.
+     * @param int $__exc_intLineNumber The line number in the file where the error occurred.
+     * @param string $__exc_strStackTrace The stack trace detailing the call stack at the time of the error.
+     * @param array $__exc_objErrorAttributeArray An optional array of additional error attributes or metadata.
+     * @return void Does not return any value. This method halts execution of the script after displaying the error.
+     */
     protected static function displayError(
-        $__exc_strType,
-        $__exc_errno,
-        $__exc_strObjectType,
-        $__exc_strMessage,
-        $__exc_strFilename,
-        $__exc_intLineNumber,
-        $__exc_strStackTrace,
-        $__exc_objErrorAttributeArray
+        string $__exc_strType,
+        int    $__exc_errno,
+        string $__exc_strObjectType,
+        string $__exc_strMessage,
+        string $__exc_strFilename,
+        int    $__exc_intLineNumber,
+        string $__exc_strStackTrace,
+        array $__exc_objErrorAttributeArray
 
-    ) {
+    ): void
+    {
         if (ob_get_length()) {
             $__exc_strRenderedPage = ob_get_contents();
             ob_clean();
@@ -252,17 +245,20 @@ class Manager
     }
 
     /**
-     * Some errors are not caught by a php custom error handler, which can cause the system to silently fail.
-     * This shutdown function will catch those errors.
+     * Handles application shutdown tasks such as outputting timer information and handling any fatal errors.
+     * If a timer output file is defined and the Timer class is available, this function writes the timer output to the file.
+     * Additionally, it checks for any fatal errors that occurred before shutdown and processes them if detected.
+     *
+     * @return void
      */
 
-    public static function shutdown()
+    public static function shutdown(): void
     {
         if (defined('QCUBED_TIMER_OUT_FILE') && class_exists('\\QCubed\\Timer')) {
-            $strTimerOutput = \QCubed\Timer::VarDump(false);
-            if ($strTimerOutput) {
-                file_put_contents(QCUBED_TIMER_OUT_FILE, $strTimerOutput . "\n", FILE_APPEND);
-            }
+            $strTimerOutput = Timer::VarDump(false);
+            //if ($strTimerOutput) {
+                //file_put_contents(QCUBED_TIMER_OUT_FILE, $strTimerOutput . "\n", FILE_APPEND);
+            //}
         }
 
         $error = error_get_last();
@@ -270,7 +266,7 @@ class Manager
             is_array($error)
             /*&&
             (!defined('QCodeGen::DebugMode') || QCodeGen::DebugMode)*/
-        ) { // if we are codegenning, only error if we are in debug mode. Prevents chmod error.
+        ) { // if we are code genning, only error if we are in debug mode. Prevents chmod error.
 
             self::handleError (
                 $error['type'],

@@ -19,11 +19,19 @@ namespace QCubed;
  */
 class ErrorAttribute
 {
-    public $Label;
-    public $Contents;
-    public $MultiLine;
+    public string $Label;
+    public string $Contents;
+    public bool $MultiLine;
 
-    public function __construct($strLabel, $strContents, $blnMultiLine)
+    /**
+     * Constructor for initializing the object with label, contents, and multi-line preference.
+     *
+     * @param string $strLabel The label, for instance.
+     * @param string $strContents The contents associated with the instance.
+     * @param bool $blnMultiLine Indicates whether the contents are multi-line.
+     * @return void
+     */
+    public function __construct(string $strLabel, string $strContents, bool $blnMultiLine)
     {
         $this->Label = $strLabel;
         $this->Contents = $strContents;

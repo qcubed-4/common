@@ -10,9 +10,11 @@
 
 namespace QCubed;
 
+use Exception;
 use QCubed\Exception\Caller;
 use QCubed\Exception\UndefinedMethod;
 use QCubed\Exception\UndefinedProperty;
+use ReflectionClass;
 
 /**
  * Class ObjectBase
@@ -20,7 +22,6 @@ use QCubed\Exception\UndefinedProperty;
  * This is the Base class for ALL classes in the system.  It provides
  * proper error handling of property getters and setters.  It also
  * provides the overrideAttribute functionality.
- * @was QBaseClass
  * @package QCubed
  */
 abstract class ObjectBase
@@ -28,43 +29,51 @@ abstract class ObjectBase
     /**
      * Override method to perform a property "Get"
      * This will get the value of $strName
-     * All inhereted objects that call __get() should always fall through
+     * All inherited objects that call __get() should always fall through
      * to calling parent::__get() in a try/catch statement catching
      * for CallerExceptions.
      *
      * @param string $strName Name of the property to get
      *
-     * @throws UndefinedProperty
      * @return mixed the returned property
+     * @throws UndefinedProperty
      */
-    public function __get($strName)
+    public function __get(string $strName): mixed
     {
-        $objReflection = new \ReflectionClass($this);
+        $objReflection = new ReflectionClass($this);
         throw new UndefinedProperty("GET", $objReflection->getName(), $strName);
     }
 
     /**
      * Override method to perform a property "Set"
      * This will set the property $strName to be $mixValue
-     * All inhereted objects that call __set() should always fall through
+     * All inherited objects that call __set() should always fall through
      * to calling parent::__set() in a try/catch statement catching
      * for CallerExceptions.
      *
      * @param string $strName Name of the property to set
      * @param string $mixValue New value of the property
      *
+     * @return void the property that was set
      * @throws UndefinedProperty
-     * @return mixed the property that was set
      */
-    public function __set($strName, $mixValue)
+    public function __set(string $strName, mixed $mixValue): void
     {
-        $objReflection = new \ReflectionClass($this);
+        $objReflection = new ReflectionClass($this);
         throw new UndefinedProperty("SET", $objReflection->getName(), $strName);
     }
 
-    public function __call($strName, $arguments)
+    /**
+     * Magic method triggered when invoking inaccessible or undefined methods in an object context.
+     *
+     * @param string $strName The name of the called method.
+     * @param array $arguments The arguments passed to the called method.
+     *
+     * @throws UndefinedMethod When an undefined or inaccessible method is called.
+     */
+    public function __call(string $strName, array $arguments)
     {
-        $objReflection = new \ReflectionClass($this);
+        $objReflection = new ReflectionClass($this);
         throw new UndefinedMethod($objReflection->getName(), $strName);
     }
 
@@ -73,17 +82,17 @@ abstract class ObjectBase
      * This allows you to set any properties, given by a name-value pair list
      * in mixOverrideArray.
      * Each item in mixOverrideArray needs to be either a string in the format
-     * of Property=Value or an array in the format of array(Property => Value).
+     * of Property=Value or an array in the format of array (Property => Value).
      * overrideAttributes() will basically call
      * $this->Property = Value for each string element in the array.
      * Value can be surrounded by quotes... but this is optional.
      *
-     * @param string|array $mixOverrideArray
-     * @throws \Exception|Caller
+     * @param array|string $mixOverrideArray
      * @return void
      * @was OverrideAttributes
+     *@throws Exception|Caller
      */
-    final public function overrideAttributes($mixOverrideArray)
+    final public function overrideAttributes(array|string $mixOverrideArray): void
     {
         // Iterate through the overrideAttribute Array
         if ($mixOverrideArray) {
@@ -108,13 +117,13 @@ abstract class ObjectBase
                     $mixValue = substr($mixOverrideItem, $intPosition + 1);
 
                     // Ensure that the Value is properly formatted (unquoted, single-quoted, or double-quoted)
-                    if (substr($mixValue, 0, 1) == "'") {
-                        if (substr($mixValue, strlen($mixValue) - 1) != "'") {
+                    if (str_starts_with($mixValue, "'")) {
+                        if (!str_ends_with($mixValue, "'")) {
                             throw new Caller(sprintf("Improperly formatted overrideAttribute: %s", $mixOverrideItem));
                         }
                         $mixValue = substr($mixValue, 1, strlen($mixValue) - 2);
-                    } elseif (substr($mixValue, 0, 1) == '"') {
-                        if (substr($mixValue, strlen($mixValue) - 1) != '"') {
+                    } elseif (str_starts_with($mixValue, '"')) {
+                        if (!str_ends_with($mixValue, '"')) {
                             throw new Caller(sprintf("Improperly formatted overrideAttribute: %s", $mixOverrideItem));
                         }
                         $mixValue = substr($mixValue, 1, strlen($mixValue) - 2);

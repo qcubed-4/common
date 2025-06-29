@@ -18,20 +18,20 @@ namespace QCubed\Error;
  */
 class Handler
 {
-    protected $intStoredErrorLevel;
+    protected ?int $intStoredErrorLevel = null;
 
     /**
      * Handler constructor.
      *
-     * @param callable $func    A callable that will be used temporarily as the function
+     * @param callable|null $func A callable that will be used temporarily as the function
      * @param null $intLevel
      */
     public function __construct(?callable $func = null, $intLevel = null)
     {
         if (!$func) {
-            // No Error Handling is wanted -- simulate a "On Error, Resume" type of functionality
+            // No Error Handling is wanted -- simulate an "On Error, Resume" type of functionality
             set_error_handler('\\QCubed\\Error\\Manager::handleError', 0); // invalidate our default handler
-            $this->intStoredErrorLevel = error_reporting(0); // turn off all error reporting
+            $this->intStoredErrorLevel = error_reporting(0); // turn off all error reportings
         } else {
             set_error_handler($func, $intLevel);
             $this->intStoredErrorLevel = -1;
@@ -41,19 +41,21 @@ class Handler
     /**
      * Restores the temporarily overridden default error handling mechanism back to the default.
      */
-    public function restore()
+    public function restore(): void
     {
-        if ($this->intStoredErrorLevel !== null) {
-            if ($this->intStoredErrorLevel != -1) {
-                error_reporting($this->intStoredErrorLevel);
-            }
-            restore_error_handler();
-            $this->intStoredErrorLevel = null;
+        if ($this->intStoredErrorLevel != -1) {
+            error_reporting($this->intStoredErrorLevel);
         }
+        restore_error_handler();
+        $this->intStoredErrorLevel = null;
     }
 
     /**
-     * Makes sure the error handler gets restored.
+     * Class destructor.
+     *
+     * Restores the state modified during the lifetime of the object.
+     *
+     * @return void
      */
     public function __destruct()
     {

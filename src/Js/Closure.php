@@ -9,38 +9,39 @@
 
 namespace QCubed\Js;
 
+use JsonSerializable;
+
 /**
  * Class Closure
  *
- * An object which represents a javascript closure (annonymous function). Use this to embed a
- * function into a PHP array or object that eventually will get turned into javascript.
+ * An object which represents a JavaScript closure (anonymous function). Use this to embed a
+ * function into a PHP array or object that eventually will get turned into JavaScript.
  * @package QCubed\Js
- * @was QJsClosure
  */
-class Closure implements \JsonSerializable
+class Closure implements JsonSerializable
 {
-    /** @var  string The js code for the function. */
-    protected $strBody;
-    /** @var array parameter names for the function call that get passed into the function. */
-    protected $strParamsArray;
+    /** @var  string The JS code for the function. */
+    protected string $strBody;
+    /** @var array|null parameter names for the function call that gets passed into the function. */
+    protected ?array $strParamsArray = null;
 
     /**
      * @param string $strBody The function body
      * @param array|null $strParamsArray The names of the parameters passed in the function call
      */
-    public function __construct($strBody, $strParamsArray = null)
+    public function __construct(string $strBody, ?array $strParamsArray = null)
     {
         $this->strBody = $strBody;
         $this->strParamsArray = $strParamsArray;
     }
 
     /**
-     * Return a javascript enclosure. Enclosures cannot be included in JSON, so we need to create a custom
-     * encoding to include in the json that will get decoded at the other side.
+     * Return a JavaScript enclosure. Enclosures cannot be included in JSON, so we need to create a custom
+     * encoding to include in the JSON that will get decoded on the other side.
      *
      * @return string
      */
-    public function toJsObject()
+    public function toJsObject(): string
     {
         $strParams = $this->strParamsArray ? implode(', ', $this->strParamsArray) : '';
         return 'function(' . $strParams . ') {' . $this->strBody . '}';

@@ -9,9 +9,11 @@
 
 namespace QCubed;
 
+use FilesystemIterator;
+
 /**
  * Class QFolder
- * Handles folders(directories) located on your filesystem
+ * Handles folders(directories) located in your filesystem
  * @package QCubed
  * @was QFolder
  */
@@ -23,12 +25,12 @@ abstract class Folder
      * This method does no special error handling.  If you want to use special error handlers,
      * be sure to set that up BEFORE calling MakeDirectory.
      *
-     * @param         string $strPath actual path of the directoy you want created
-     * @param         integer $intMode optional mode
+     * @param string $strPath an actual path of the directory you want created
+     * @param integer|null $intMode optional mode
      *
      * @return         boolean        the return flag from mkdir
      */
-    public static function makeDirectory($strPath, $intMode = null)
+    public static function makeDirectory(string $strPath, ?int $intMode = null): bool
     {
         if (is_dir($strPath)) {
             // Directory Already Exists
@@ -41,12 +43,12 @@ abstract class Folder
         }
 
         if (PHP_OS != "Linux") {
-            // Create the current node/directory, and return its result
+            // Create the current node/ directory and return its result
             $blnReturn = mkdir($strPath);
 
             if ($blnReturn && !is_null($intMode)) {
                 // Manually CHMOD to $intMode (if applicable)
-                // mkdir doesn't do it for mac, and this will error on windows
+                // mkdir doesn't do it for Mac, and this will error on windows,
                 // Therefore, ignore any errors that creep up
                 $e = new Error\Handler();
                 chmod($strPath, $intMode);
@@ -62,11 +64,11 @@ abstract class Folder
      * Allows for deletion of non-empty directories - takes care of
      * recursion appropriately.
      *
-     * @param    string $strPath Full path to the folder to be deleted
+     * @param string $strPath Full path to the folder to be deleted
      *
      * @return    int    number of deleted files
      */
-    public static function deleteFolder($strPath)
+    public static function deleteFolder(string $strPath): int
     {
 
         if (!is_dir($strPath)) {
@@ -99,7 +101,7 @@ abstract class Folder
      *
      * @return bool
      */
-    public static function isWritable($strPath)
+    public static function isWritable(string $strPath): bool
     {
         if ($strPath[strlen($strPath) - 1] != "/") {
             $strPath .= "/";
@@ -110,16 +112,16 @@ abstract class Folder
 
     /**
      * Traverse a particular path and get a list of files and folders
-     * underneath that path. Optionally, also provide a regular
+     * underneath that path. Optionally, it also provides a regular
      * expression that specifies the pattern that the returned files must match.
      *
-     * @param    string $strPath full path to the folder to be processed
-     * @param    boolean $blnSkipFolders If this is set to true, only the FILES will be returned - not the folders.
-     * @param    string $strFilenamePattern : optional string; regular expression that the files must match in order to be returned. If it's not set, all files in that folder will be returned.
+     * @param string $strPath full path to the folder to be processed
+     * @param boolean $blnSkipFolders If this is set to true, only the FILES will be returned - not the folders.
+     * @param string|null $strFilenamePattern optional string; regular expression that the files must match in order to be returned. If it's not set, all files in that folder will be returned.
      *
      * @return array
      */
-    public static function listFilesInFolder($strPath, $blnSkipFolders = true, $strFilenamePattern = null)
+    public static function listFilesInFolder(string $strPath, bool $blnSkipFolders = true, ?string $strFilenamePattern = null): array
     {
         // strip off the trailing slash if it's there
         if ($strPath[strlen($strPath) - 1] == "/") {
@@ -143,7 +145,7 @@ abstract class Folder
             }
 
             if (!$blnSkipFolders || !is_dir($childPath)) {
-                if (!$strFilenamePattern || ($strFilenamePattern && preg_match($strFilenamePattern, $item))) {
+                if (!$strFilenamePattern || preg_match($strFilenamePattern, $item)) {
                     $result[] = $item;
                 }
             }
@@ -155,7 +157,7 @@ abstract class Folder
     /**
      * Helper function for getRecursiveFolderContents.
      * Returns the list of files in the folder that match a given pattern
-     * Result is an array of strings of form "filename.extension".
+     * Result is an array of strings of a form "filename.extension".
      * Not recursive!
      *
      *
@@ -163,15 +165,14 @@ abstract class Folder
      *
      * @return array
      */
-    private static function getFilesInFolderHelper($strPath)
+    private static function getFilesInFolderHelper(string $strPath): array
     {
-        // Remove trailing slash if it's there
+        // Remove the trailing slash if it's there
         if ($strPath[strlen($strPath) - 1] == "/") {
             $strPath = substr($strPath, 0, -1);
         }
         $result = array();
         $dh = opendir($strPath);
-        assert($dh !== false); // Does directory exist?
         if ($dh === false) {
             return [];
         }    // if asserts are off
@@ -179,7 +180,7 @@ abstract class Folder
         while (($file = readdir($dh)) !== false) {
             if ($file != "." && $file != "..") {
                 if (!is_dir($file)) {
-                    array_push($result, $file);
+                    $result[] = $file;
                 }
             }
         }
@@ -197,7 +198,7 @@ abstract class Folder
      * @param boolean $blnOverwrite True to overwrite a file if it already exists. False to leave existing files alone.
      */
 
-    public static function mergFolders($srcPath, $dstPath, $blnOverwrite)
+    public static function mergFolders(string $srcPath, string $dstPath, bool $blnOverwrite): void
     {
         if (!$srcPath || !is_dir($srcPath)) {
             return;
@@ -236,18 +237,20 @@ abstract class Folder
      * @param string $dir
      * @return int
      */
-    public static function countItems($dir) {
-        $fi = new \FilesystemIterator($dir, \FilesystemIterator::SKIP_DOTS);
+    public static function countItems(string $dir): int
+    {
+        $fi = new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS);
         return iterator_count($fi);
     }
 
     /**
-     * Removes all the items in the given directory, while preserving the directory itself.
+     * Removes all the items in the given directory while preserving the directory itself.
      *
      * @param string $dir
      */
-    public static function emptyContents($dir) {
-        $iterator = new \FilesystemIterator($dir, \FilesystemIterator::SKIP_DOTS);
+    public static function emptyContents(string $dir): void
+    {
+        $iterator = new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS);
         if (!$iterator->valid()) {
             return;
         }
@@ -259,5 +262,18 @@ abstract class Folder
                 unlink($fileinfo->getPathname());
             }
         }
+    }
+
+    /**
+     * Copies the contents of one directory to another.
+     *
+     * @param string $string The source directory path.
+     * @param string $string1 The destination directory path.
+     * @param bool $blnOverwrite Determines whether to overwrite existing files in the destination directory.
+     *
+     * @return void
+     */
+    private static function copy_dir(string $string, string $string1, bool $blnOverwrite): void
+    {
     }
 }

@@ -9,25 +9,27 @@
 
 namespace QCubed;
 
+use QCubed\Database\DatabaseBase;
 use QCubed\Exception\Caller;
+use Exception;
 use QCubed\Js\Helper;
 
 abstract class ErrorHandler
 {
     /** @var null|int Stored Error Level (used for Settings and Restoring error handler) */
-    private static $intStoredErrorLevel = null;
+    private static ?int $intStoredErrorLevel = null;
 
     /**
      * Temprorarily overrides the default error handling mechanism.  Remember to call
      * RestoreErrorHandler to restore the error handler back to the default.
      *
      * @param string $strName the name of the new error handler function, or NULL if none
-     * @param integer $intLevel if a error handler function is defined, then the new error reporting level (if any)
+     * @param integer|null $intLevel if a error handler function is defined, then the new error reporting level (if any)
      *
      * @throws Caller
      * @was QApplication::SetErrorHandler
      */
-    public static function set($strName, $intLevel = null)
+    public static function set(string $strName, ?int $intLevel = null): void
     {
         if (!is_null(self::$intStoredErrorLevel)) {
             throw new Caller('Error handler is already currently overridden.  Cannot override twice.  Call RestoreErrorHandler before calling SetErrorHandler again.');
@@ -43,10 +45,13 @@ abstract class ErrorHandler
     }
 
     /**
-     * Restores the temporarily overridden default error handling mechanism back to the default.
-     * @was QApplication::RestoreErrorHandler
+     * Restores the previous error reporting level and error handler to their original state.
+     * Throws an exception if the error handler was not previously overridden.
+     *
+     * @return void
+     * @throws Caller
      */
-    public static function restore()
+    public static function restore(): void
     {
         if (is_null(self::$intStoredErrorLevel)) {
             throw new Caller('Error handler is not currently overridden.  Cannot reset something that was never overridden.');
@@ -63,10 +68,10 @@ abstract class ErrorHandler
      *
      * @param $__exc_objException
      */
-    public static function handleException(\Exception $__exc_objException)
+    public static function handleException(\Exception $__exc_objException): void
     {
         if (class_exists('\ApplicationBase')) {
-            \QApplicationBase::$ErrorFlag = true;
+            ApplicationBase::$ErrorFlag = true;
         }
 
         global $__exc_strType;
@@ -79,7 +84,7 @@ abstract class ErrorHandler
         $__exc_strMessage = $__exc_objException->getMessage();
         //$__exc_strObjectType = $__exc_objReflection->getName();
 
-        if ($__exc_objException instanceof \QCubed\Database\AbstractBase) {
+        if ($__exc_objException instanceof DatabaseBase) {
             $__exc_objErrorAttribute = new ErrorAttribute("Database Error Number", $__exc_errno, false);
             $__exc_objErrorAttributeArray[0] = $__exc_objErrorAttribute;
 
@@ -89,7 +94,7 @@ abstract class ErrorHandler
             }
         }
 
-        if ($__exc_objException instanceof \QDataBindException) {
+        if ($__exc_objException instanceof Caller) {
             if ($__exc_objException->Query) {
                 $__exc_objErrorAttribute = new ErrorAttribute("Query", $__exc_objException->Query, true);
                 $__exc_objErrorAttributeArray[1] = $__exc_objErrorAttribute;
@@ -128,7 +133,7 @@ abstract class ErrorHandler
      * @param int $intSkipTraces
      * @return string
      */
-    public static function getBacktrace($blnShowArgs = false, $intSkipTraces = 1)
+    public static function getBacktrace(?bool $blnShowArgs = false, int $intSkipTraces = 1): string
     {
         if (!$blnShowArgs) {
             $b = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
@@ -176,7 +181,7 @@ abstract class ErrorHandler
      * @param $__exc_errcontext
      * @return bool
      */
-    public static function handleError($__exc_errno, $__exc_errstr, $__exc_errfile, $__exc_errline, $__exc_errcontext)
+    public static function handleError($__exc_errno, $__exc_errstr, $__exc_errfile, $__exc_errline, $__exc_errcontext): bool
     {
         // If a command is called with "@", then we should return
         if (error_reporting() == 0) {
@@ -184,7 +189,7 @@ abstract class ErrorHandler
         }
 
         if (class_exists('\ApplicationBase')) {
-            \QApplicationBase::$ErrorFlag = true;
+            ApplicationBase::$ErrorFlag = true;
         }
 
         global $__exc_strType;

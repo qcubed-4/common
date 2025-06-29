@@ -1,6 +1,18 @@
 <?php
-/*
- * error_page include file
+use QCubed\Project\Application;
+use QCubed\Project\Control\ControlBase;
+use QCubed\Project\Control\FormBase as Form;
+
+// Define default values for variables if they are not already set
+$__exc_strMessage = $__exc_strMessage ?? 'Unknown Error';
+$__exc_strFilename = $__exc_strFilename ?? '';
+$__exc_strType = $__exc_strType ?? 'Error';
+$__exc_strObjectType = $__exc_strObjectType ?? 'Unknown Type';
+$__exc_intLineNumber = $__exc_intLineNumber ?? 1;
+$__exc_strStackTrace = $__exc_strStackTrace ?? 'No stack trace available.';
+
+/**
+ * error_page include a file
  *
  * expects the following variables to be set:
  * 	$__exc_strType
@@ -29,23 +41,23 @@ if (file_exists($__exc_strFilename)) {
 
 header("HTTP/1.1 500 Internal Server Error");
 if (class_exists('\QCubed\Project\Application')) {
-    \QCubed\Project\Application::setProcessOutput(false);
+    Application::setProcessOutput(false);
 }
 ?>
 <!DOCTYPE html>
 <?php
 if (stristr($__exc_strMessage, "Invalid Form State Data") !== false) {
-	// It was a invalid form state data
-	// We return this string because invalid form state data error response does not behave like other errors
-	// and gets unable to render the QDialogBox for the error. Since qcubed.js searches for '<html>' in the beginning
-	// of the response to display it in the new Window, the following line will circumvent that behavior
+    // This was invalid form state data
+    // We return this string because the invalid form state data error response doesn't behave like other errors,
+    // and we can't render a dialog box for the error. Since qcubed.js looks for '<html>' at the beginning of
+    // the response to display it in a new window, the following line avoids this behavior
 	echo '<!-- -->';
 }
 ?>
-<html>
+<html lang="en" class="no-js">
 	<head>
 		<title>PHP <?= htmlentities($__exc_strType); ?> - <?= htmlentities($__exc_strMessage) ?></title>
-		<style type="text/css">@import url("<?= QCUBED_CSS_URL ?>/qcubed.css");</style>
+        <link href="<?= QCUBED_CSS_URL ?>/qcubed.css" rel="stylesheet">
 	</head>
 	<body>
 		<header>
@@ -117,16 +129,14 @@ if (stristr($__exc_strMessage, "Invalid Form State Data") !== false) {
 				$__exc_StrToScript = "";
 				$varCounter = 0;
 				foreach ($__exc_ObjVariableArrayKeys as $__exc_Key) {
-					if ((strpos($__exc_Key, "__exc_") === false) && (strpos($__exc_Key, "_DATE_") === false) && ($__exc_Key != "GLOBALS") && !($__exc_ObjVariableArray[$__exc_Key] instanceof QForm)) {
+					if ((!str_contains($__exc_Key, "__exc_")) && (!str_contains($__exc_Key, "_DATE_")) && ($__exc_Key != "GLOBALS") && !($__exc_ObjVariableArray[$__exc_Key] instanceof Form)) {
 						try {
 							if (($__exc_Key == 'HTTP_SESSION_VARS') || ($__exc_Key == '_SESSION')) {
-								$__exc_ObjSessionVarArray = array();
-								foreach ($$__exc_Key as $__exc_StrSessionKey => $__exc_StrSessionValue) {
-									if (strpos($__exc_StrSessionKey, 'qform') !== 0)
-										$__exc_ObjSessionVarArray[$__exc_StrSessionKey] = $__exc_StrSessionValue;
-								}
+                                $__exc_ObjSessionVarArray = array_filter($$__exc_Key, function ($__exc_StrSessionKey) {
+                                    return !str_starts_with($__exc_StrSessionKey, 'qform');
+                                }, ARRAY_FILTER_USE_KEY);
 								$__exc_StrVarExport = htmlentities(var_export($__exc_ObjSessionVarArray, true));
-							} else if (($__exc_ObjVariableArray[$__exc_Key] instanceof \QCubed\Project\Control\ControlBase) || ($__exc_ObjVariableArray[$__exc_Key] instanceof \QCubed\Project\Control\FormBase)) {
+							} else if (($__exc_ObjVariableArray[$__exc_Key] instanceof ControlBase)) {
 								$__exc_StrVarExport = htmlentities($__exc_ObjVariableArray[$__exc_Key]->varExport());
 							} else {
 								$__exc_StrVarExport = htmlentities(var_export($__exc_ObjVariableArray[$__exc_Key], true));
@@ -137,13 +147,14 @@ if (stristr($__exc_strMessage, "Invalid Form State Data") !== false) {
 							$__exc_StrToDisplay .= sprintf("<span id=\"%s\" %s >%s</span>", $varCounter, $style, $__exc_StrVarExport);
 							$varCounter++;
 						} catch (Exception $__exc_objExcOnVarDump) {
-							$__exc_StrToDisplay .= sprintf("Fatal error:  Nesting level too deep - recursive dependency?\n", $__exc_objExcOnVarDump->getMessage());
+							//$__exc_StrToDisplay .= sprintf("Fatal error:  Nesting level too deep - recursive dependency?\n", $__exc_objExcOnVarDump->getMessage());
 						}
 					}
 				}
 
 				echo($__exc_StrToDisplay);
-?></code></pre>
+?>
+                </code></pre>
 		</section>
 
 		<hr />
@@ -153,15 +164,15 @@ if (stristr($__exc_strMessage, "Invalid Form State Data") !== false) {
 		<footer>
 			<strong>PHP Version:</strong> <?= htmlentities(PHP_VERSION); ?>;&nbsp;<strong>Zend Engine Version:</strong> <?= htmlentities(zend_version()); ?>;&nbsp;<strong>QCubed Version:</strong> <?= htmlentities(QCUBED_VERSION); ?><br />
 			<?php if (array_key_exists('OS', $_SERVER)) printf('<strong>Operating System:</strong> %s;&nbsp;&nbsp;', $_SERVER['OS']); ?><strong>Application:</strong> <?= htmlentities($_SERVER['SERVER_SOFTWARE']); ?>;&nbsp;<strong>Server Name:</strong> <?= htmlentities($_SERVER['SERVER_NAME']); ?><br />
-			<strong>HTTP User Agent:</strong> <?= htmlentities(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'N/A'); ?>
+			<strong>HTTP User Agent:</strong> <?= htmlentities($_SERVER['HTTP_USER_AGENT'] ?? 'N/A'); ?>
 		</footer>
 	<?php printf('<script type="text/javascript">%s</script>', $__exc_StrToScript); ?>
 	<script type="text/javascript">
 		function ToggleHidden(strDiv) {
-			var obj = document.getElementById(strDiv);
-			var stlSection = obj.style;
-			var isCollapsed = obj.style.display.length;
-			if (isCollapsed) { stlSection.display = ''; }else{ stlSection.display = 'none'; }
+            const obj = document.getElementById(strDiv);
+            const stlSection = obj["style"];
+            const isCollapsed = obj["style"].display.length;
+            if (isCollapsed) { stlSection.display = ''; }else{ stlSection.display = 'none'; }
 		}
 	</script>
 </body>

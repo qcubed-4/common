@@ -9,31 +9,32 @@
 
 namespace QCubed\Js;
 
+use JsonSerializable;
+
 /**
  * Class Func
  * Outputs a function call to a global function or function in an object referenced from global space. The purpose
  * of this is to immediately use the results of the function call, as opposed to a closure, which stores a pointer
  * to a function that is used later.
  * @package QCubed\Js
- * @was QJsFunction
  */
-class Func implements \JsonSerializable
+class Func implements JsonSerializable
 {
     /** @var  string|null */
-    protected $strContext;
+    protected ?string $strContext = null;
     /** @var  string */
-    protected $strFunctionName;
+    protected string $strFunctionName;
     /** @var  array|null */
-    protected $params;
+    protected ?array $params = null;
 
     /**
      * Func constructor.
      * @param string $strFunctionName The name of the function call.
-     * @param null|array $params If given, the parameters to send to the function call
-     * @param null|string $strContext If given, the object in the window object which contains the function and is the context for the function.
+     * @param array|null $params If given, the parameters to send it to the function call
+     * @param string|null $strContext If given, the object in the window object which contains the function and is the context for the function.
      *   Use dot '.' notation to traverse the object tree. i.e. "obj1.obj2" refers to window.obj1.obj2 in javascript.
      */
-    public function __construct($strFunctionName, $params = null, $strContext = null)
+    public function __construct(string $strFunctionName, ?array $params = null, ?string $strContext = null)
     {
         $this->strFunctionName = $strFunctionName;
         $this->params = $params;
@@ -41,10 +42,10 @@ class Func implements \JsonSerializable
     }
 
     /**
-     * Returns this as a javascript string to be included in the end script of the page.
+     * Returns this as a JavaScript string to be included in the end script of the page.
      * @return string
      */
-    public function toJsObject()
+    public function toJsObject(): string
     {
         if ($this->params) {
             $strParams = [];
@@ -63,7 +64,7 @@ class Func implements \JsonSerializable
     }
 
     /**
-     * Returns this as a json object to be sent to qcubed.js during ajax drawing.
+     * Returns this as a JSON object to be sent to qcubed.js during ajax drawing.
      * @return mixed
      */
     public function jsonSerialize(): mixed

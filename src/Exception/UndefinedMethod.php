@@ -14,7 +14,14 @@ namespace QCubed\Exception;
  */
 class UndefinedMethod extends Caller
 {
-    public function __construct($strClass, $strMethod)
+    /**
+     * Constructor for initializing an exception with details about an undefined method in a class.
+     *
+     * @param string $strClass The name of the class where the method is undefined.
+     * @param string $strMethod The name of the undefined method.
+     * @return void
+     */
+    public function __construct(string $strClass, string $strMethod)
     {
         parent::__construct(sprintf("Undefined method in '%s' class: %s", $strClass, $strMethod),
             2);

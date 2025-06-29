@@ -10,6 +10,7 @@
 namespace QCubed;
 
 use QCubed\Exception\Caller;
+use Exception;
 use QCubed as Q;
 
 /**
@@ -17,7 +18,7 @@ use QCubed as Q;
  *
  * Class QCryptography: Helps in encrypting and decrypting data using block ciphers.
  *
- * Uses the openssl_* methods
+ * Use the openssl_* methods
  *
  * Can use a variety of encryption methods, but the default method, AES-256-CBC, is recommended.
  *
@@ -28,7 +29,7 @@ use QCubed as Q;
  * 1) Serialize the instance of this class and save it after you initialize it. You must be sure to save it in a safe place since it
  *      contains your encryption key. For example, you can make it a form variable, or a session variable,
  *      making sure your form or session data is secure and
- *    cannot be seen by a user, then when the instance gets unserialized, the IV will be restored automatically.
+ *    cannot be seen by a user; then when the instance gets unserialized, the IV will be restored automatically.
  *      Storing the instance in the Application object or a global variable will not work, since these things are reinitialized every
  *    time PHP starts up, and you will get a different IV at that time. If you do not correctly
  *      restore the IV that was used to Encrypt, then you will not be able to Decrypt.
@@ -36,34 +37,33 @@ use QCubed as Q;
  * 2) Pass a value to $strIvHashKey in the constructor, and the initialization vector will be appended to the resulting encrypted data.
  *    This hash key SHOULD be a static value that is part of your app and must be passed to the constructor of any instance of
  *      Cryptography that will be used to decrypt the data. This gives you the ability to decrypt the value without needing to save
- *      the IV or rely on serialized instance of this class.
+ *      the IV or rely on a serialized instance of this class.
  *
  *      Note that the IvHashKey is not the Iv, but rather a hash key used to determine whether the Iv has been tampered with.
  *
  *      Note that appending the IV to the encrypted data does not compromise the encrypted data at all, but it will make the data
- *      larger. If you are doing block-level ciphering and you want the resulting encryption to be the same size as the given data,
+ *      larger. If you are doing block-level ciphering, and you want the resulting encryption to be the same size as the given data,
  *      you must be aware of that.
  *
  * @package QCubed
- * @was QCryptography
  */
 class Cryptography extends ObjectBase
 {
     /** @var bool Are we going to use Base 64 encoding? */
-    protected $blnBase64;
+    protected mixed $blnBase64;
     /** @var string Key to be used for encryption/decryption */
-    protected $strKey;
+    protected string $strKey;
     /**
-     * @var string Initialization vector for the algorithm
+     * @var string|null Initialization vector for the algorithm
      *
      *             Note that this is NOT used in ECB modes
      */
-    protected $strIv = '';
+    protected ?string $strIv = '';
     /** @var  string Cipher to use when creating the encryption object */
-    protected $strCipher;
+    protected string $strCipher;
 
     /** @var  string The hash key to use when protecting the embedded IV, if requested. */
-    protected $strIvHashKey;
+    protected mixed $strIvHashKey;
 
     /**
      * Default Base64 mode for any new QCryptography instances that get constructed.
@@ -72,29 +72,31 @@ class Cryptography extends ObjectBase
      * Note that by setting Base64 to true, it will result in an encrypted data string
      * that is 33% larger.
      *
-     * @var string Base64
+     * @var string|bool Base64
      */
-    public static $Base64 = true;
+    public static string|bool $Base64 = true;
 
     /**
-     * @param null|string $strKey    Encryption key
-     * @param null|bool   $blnBase64 Are we going to Base 64 the encoded data?
-     * @param null|string $strCipher Cipher to be used (default is AES-256-CBC)
-     * @param null|string $strIvHash  A hash key to use. If given, will cause the IV to be added to the end of encrypted values so its
-     * 								  possible to decrypt the value if the IV is lost. See above discussion.
+     * Constructor for the class.
      *
-     * @throws Caller
-     * @throws \Exception
+     * @param string|null $strKey The cryptographic key to be used. If not provided, default to QCUBED_CRYPTOGRAPHY_DEFAULT_KEY if defined.
+     * @param bool|null $blnBase64 A flag determining if the output should be Base64 encoded. Defaults to the value of self::$Base64 if unspecified.
+     * @param string|null $strCipher The cipher algorithm to be used for encryption/decryption. Defaults to 'AES-256-CBC' or QCUBED_CRYPTOGRAPHY_DEFAULT_CIPHER if defined.
+     * @param mixed|null $strIvHashKey The Initialization Vector (IV) hash key, which may be required for certain encryption algorithms.
+     *
+     * @return void
+     *
+     * @throws Exception If the cryptographic key is not provided and QCUBED_CRYPTOGRAPHY_DEFAULT_KEY is not defined.
+     * @throws Exception If the specified cipher algorithm is not supported by the OpenSSL library.
      */
-    public function __construct($strKey = null, $blnBase64 = null, $strCipher = null, $strIvHashKey = null)
+    public function __construct(?string $strKey = null, ?bool $blnBase64 = null, ?string $strCipher = null, mixed $strIvHashKey = null)
     {
-
         $this->strIvHashKey = $strIvHashKey;
 
         // Get the Key
         if (is_null($strKey)) {
             if (!defined('QCUBED_CRYPTOGRAPHY_DEFAULT_KEY')) {
-                throw new \Exception('To use QCubed\\Cryptography, either pass in a key, or define QCUBED_CRYPTOGRAPHY_DEFAULT_KEY in your config file');
+                throw new Exception('To use QCubed\\Cryptography, either pass in a key or define QCUBED_CRYPTOGRAPHY_DEFAULT_KEY in your config file');
             }
             $this->strKey = QCUBED_CRYPTOGRAPHY_DEFAULT_KEY;
         } else {
@@ -126,12 +128,12 @@ class Cryptography extends ObjectBase
         try {
             // The following method will automatically test for availability of the supplied cipher name
             $strIvLength = openssl_cipher_iv_length($this->strCipher);
-        } catch (\Exception $e) {
-            throw new Caller('No Cipher with name ' . $this->strCipher . ' could be found in openssl library');
+        } catch (Exception $e) {
+            throw new Caller('No Cipher with name ' . $this->strCipher . ' could be found in an openssl library');
         }
 
         if ($strIvLength == 0) {
-            // IV is not needed for the selected algorithm (it could be a ECB algorithm)
+            // IV is not needed for the selected algorithm (it could be an ECB algorithm)
             $this->strIv = null;
         } else {
             // Generate random IV
@@ -140,13 +142,17 @@ class Cryptography extends ObjectBase
     }
 
     /**
-     * Encrypt the data (depends on the value of class members)
-     * @param string $strData
+     * Encrypts the provided data using the specified cipher, key, and IV (Initialization Vector).
      *
-     * @return mixed|string
-     * @throws Q\Exception\Cryptography
+     * @param string $strData The plaintext data to be encrypted.
+     *
+     * @return string The encrypted data. Depending on the configuration, the output may include the IV
+     *                and a hash for tampering validation. If Base64 encoding is enabled, the result
+     *                will be Base64 URL-safe encoded.
+     *
+     * @throws Exception If encryption fails.
      */
-    public function encrypt($strData)
+    public function encrypt(string $strData): string
     {
         $strEncryptedData = openssl_encrypt($strData, $this->strCipher, $this->strKey, 0, $this->strIv);
 
@@ -180,7 +186,7 @@ class Cryptography extends ObjectBase
      * @return string
      * @throws Q\Exception\Cryptography
      */
-    public function decrypt($strEncryptedData)
+    public function decrypt(string $strEncryptedData): string
     {
         if ($this->blnBase64) {
             $strEncryptedData = QString::base64UrlSafeDecode($strEncryptedData);
@@ -188,7 +194,7 @@ class Cryptography extends ObjectBase
         $strIv = $this->strIv;
         if ($this->strIvHashKey) {
             $offset = strrpos($strEncryptedData, ":");
-            if ($offset === null) {
+            if ($offset == null) {
                 throw new Q\Exception\Cryptography("Hash value not found.");
             }
             $hash1 = substr($strEncryptedData, $offset + 1);
@@ -202,27 +208,27 @@ class Cryptography extends ObjectBase
 
             $offset2 = strrpos($strEncryptedData, ":");
 
-            if ($offset2 === null) {
+            if ($offset2 == null) {
                 throw new Q\Exception\Cryptography("IV not found.");
             }
             $strIv = substr($strEncryptedData, $offset2 + 1);
             $strIv = hex2bin($strIv);    // undo our serialization encoding
             $strEncryptedData = substr($strEncryptedData, 0, $offset2);
         }
-        $strDecryptedData = openssl_decrypt($strEncryptedData, $this->strCipher, $this->strKey, 0, $strIv);
-
-        return $strDecryptedData;
+        return openssl_decrypt($strEncryptedData, $this->strCipher, $this->strKey, 0, $strIv);
     }
 
     /**
-     * Encrypt a file (depends on the value of class members)
+     * Encrypts the contents of a given file.
      *
-     * @param string $strFile Path of the file to be encrypted
+     * @param string $strFile The path to the file whose contents need to be encrypted.
      *
-     * @return mixed|string
-     * @throws Caller
+     * @return string The encrypted contents of the file.
+     *
+     * @throws Caller If the specified file does not exist.
+     * @throws Exception
      */
-    public function encryptFile($strFile)
+    public function encryptFile(string $strFile): string
     {
         if (file_exists($strFile)) {
             $strData = file_get_contents($strFile);
@@ -241,7 +247,7 @@ class Cryptography extends ObjectBase
      * @return string
      * @throws Caller
      */
-    public function decryptFile($strFile)
+    public function decryptFile(string $strFile): string
     {
         if (file_exists($strFile)) {
             $strEncryptedData = file_get_contents($strFile);
@@ -253,27 +259,25 @@ class Cryptography extends ObjectBase
     }
 
     /**
-     * Base64 encode in a way that the result can be passed through HTML forms and URLs.
+     * Encodes a given string into a Base64 URL-safe format.
      *
-     * @param $s
-     * @deprecated See QString::Base64UrlSafeEncode
+     * @param string $s The input string to be encoded.
      *
-     * @return mixed
+     * @return string The Base64 URL-safe encoded version of the input string.
      */
-    protected static function base64Encode($s)
+    protected static function base64Encode(string $s): string
     {
         return QString::base64UrlSafeEncode($s);
     }
 
     /**
-     * Base64 Decode in a way that the result can be passed through HTML forms and URLs.
+     * Decodes a Base64 URL-safe encoded string.
      *
-     * @param $s
-     * @deprecated See QString::Base64UrlSafeDecode
+     * @param string $s The Base64 URL-safe encoded string to be decoded.
      *
-     * @return mixed
+     * @return string The decoded string.
      */
-    protected static function base64Decode($s)
+    protected static function base64Decode(string $s): string
     {
         return QString::base64UrlSafeDecode($s);
     }
