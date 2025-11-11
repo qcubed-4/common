@@ -247,7 +247,7 @@ class Timer
      * @return float|int|string The value of the property.
      * @throws Caller If the requested property does not exist.
      */
-    public function __get(string $strName): float|int|string
+    public function __get(string $strName): mixed
     {
         return match ($strName) {
             'CountStarted' => $this->intCountStarted,

@@ -117,7 +117,7 @@ class Caller extends Exception
         if (array_key_exists('line', $this->strTraceArray[$this->intOffset])) {
             $this->line = $this->strTraceArray[$this->intOffset]['line'];
         } else {
-            $this->line = '';
+            $this->line = 0; // PHP 8.1+: must be integer, not string
         }
     }
 
@@ -136,7 +136,7 @@ class Caller extends Exception
         if (array_key_exists('line', $this->strTraceArray[$this->intOffset])) {
             $this->line = $this->strTraceArray[$this->intOffset]['line'];
         } else {
-            $this->line = '';
+            $this->line = 0; // PHP 8.1+: must be integer, not string
         }
     }
 

@@ -46,6 +46,7 @@ require_once (dirname(__DIR__) . '/i18n/i18n-lib.inc.php');
  * @property-read string $Age String representation of age compared to the current age.
  * @property-read QDateTime $LastDayOfTheMonth  A new QDateTime representing the last day of this date's month.
  * @property-read QDateTime $FirstDayOfTheMonth A new QDateTime representing the first day of this date's month.
+ * @method gFormat(string $string)
  */
 class QDateTime extends DateTime implements JsonSerializable, Serializable
 {
@@ -84,6 +85,10 @@ class QDateTime extends DateTime implements JsonSerializable, Serializable
     const int DATE_ONLY_TYPE = 1;
     const int TIME_ONLY_TYPE = 2;
     const int DATE_AND_TIME_TYPE = 3;
+    /**
+     * @var null|int|\QCubed\QDateTime|string
+     */
+    public string|int|null|QDateTime $Format;
 
     /** @var bool true if the date is null */
     protected bool $blnDateNull = true;
@@ -1288,5 +1293,3 @@ class QDateTime extends DateTime implements JsonSerializable, Serializable
         }
     }
 }
-
-DateTimeInterface::RFC1123;
