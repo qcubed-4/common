@@ -1,4 +1,4 @@
-# QCubed SessionCleaner Utility
+# QCubed-4 SessionCleaner Utility
 
 A lightweight utility for managing and automatically cleaning temporary PHP session keys inside QCubed-4 applications.
 
