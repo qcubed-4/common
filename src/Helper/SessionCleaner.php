@@ -1,195 +1,186 @@
 <?php
-    /**
-     * QCubed-4 Common Utility
-     *
-     * Class: SessionCleaner
-     * ---------------------
-     * A lightweight helper for managing and automatically cleaning up
-     * short-lived PHP session keys while preserving critical application
-     * sessions like logged user IDs and CSRF tokens.
-     *
-     * © 2025 QCubed-4 Common Utilities Team
-     */
 
     namespace QCubed\Helper;
-
-    use DateTime;
 
     /**
      * Class SessionCleaner
      *
-     * @package QCubed\Helper
+     * A safe utility to automatically remove temporary or expired session keys
+     * while preserving important ones, such as authentication or security keys.
+     *
+     * Features:
+     * - Automatic expiration cleanup (autoClean)
+     * - Manual cleanup for specific temporary keys (clean)
+     * - Preservation of important keys (setPreserveKeys)
+     * - Timestamp-based expiration for each cleaned key
+     * - Safe for QCubed-4 session handling
+     * - URL debug mode (?sc_debug=1)
+     * - Debug output via debugDump()
      */
     class SessionCleaner
     {
-        /** @var array Keys that should never be deleted */
+        /** @var array List of keys that must NEVER be removed */
         protected static array $preserveKeys = [];
 
-        /** @var bool Debug output enabled */
-        protected static bool $debug = false;
+        /** @var bool Prevent autoClean from running twice per request */
+        protected static bool $hasRunAutoClean = false;
 
-        /** @var bool Automatically dump session contents after cleaning */
-        protected static bool $autoDump = false;
-
-        /** @var int Max value length shown in logs */
-        protected static int $maxLogValueLength = 200;
-
-        /** @var string Session key to store cleaner metadata */
-        protected const string META_KEY = '__session_cleaner_meta';
+        /** @var string Timestamp prefix for each managed session key */
+        protected const string TS_PREFIX = '__sc_ts_';
 
         /**
-         * Marks the start time of a temporary session.
-         */
-        public static function markCreated(): void
-        {
-            self::ensureSession();
-
-            $_SESSION[self::META_KEY]['created'] = time();
-        }
-
-        /**
-         * Defines keys that must never be deleted.
+         * Define keys that should never be removed by the cleaner.
+         * Call this once at your backend bootstrap/header.
          *
          * @param array $keys
+         * @return void
          */
         public static function setPreserveKeys(array $keys): void
         {
-            self::$preserveKeys = array_unique($keys);
+            self::$preserveKeys = array_unique(array_merge(self::$preserveKeys, $keys));
         }
 
         /**
-         * Enables or disables debug mode.
+         * Check if a key is preserved.
          *
-         * @param bool $debug
-         * @param bool $autoDump Automatically print session after cleaning
+         * @param string $key
+         * @return bool
          */
-        public static function setDebugMode(bool $debug, bool $autoDump = false): void
+        protected static function isPreserved(string $key): bool
         {
-            self::$debug = $debug;
-            self::$autoDump = $autoDump;
+            return in_array($key, self::$preserveKeys, true);
         }
 
         /**
-         * Sets the maximum length of session values printed in debug output.
+         * Automatic global cleanup — removes ALL non-preserved keys
+         * that are older than $maxAgeSeconds.
          *
-         * @param int $length
-         */
-        public static function setMaxLogValueLength(int $length): void
-        {
-            self::$maxLogValueLength = max(20, $length);
-        }
-
-        /**
-         * Automatically cleans specified keys after a given lifetime.
+         * Example:
+         *     SessionCleaner::autoClean(1800);
          *
-         * @param array $keys
-         * @param int $maxAge Lifetime in seconds
+         * @param int $maxAgeSeconds
+         * @return void
          */
-        public static function autoClean(array $keys, int $maxAge): void
+        public static function autoClean(int $maxAgeSeconds): void
         {
-            self::ensureSession();
-            self::clean($keys, $maxAge);
-        }
-
-        /**
-         * Cleans keys older than a given lifetime.
-         *
-         * @param array $keys
-         * @param int $maxAge Lifetime in seconds
-         */
-        public static function clean(array $keys, int $maxAge): void
-        {
-            self::ensureSession();
-
-            $meta = $_SESSION[self::META_KEY] ?? ['created' => time()];
-            $created = $meta['created'] ?? time();
-
-            if (time() - $created >= $maxAge) {
-                foreach ($keys as $key) {
-                    if (!in_array($key, self::$preserveKeys, true) && isset($_SESSION[$key])) {
-                        unset($_SESSION[$key]);
-                        self::log("Removed expired key: $key");
-                    }
-                }
-                $_SESSION[self::META_KEY]['created'] = time(); // reset timer
-            }
-
-            if (self::$autoDump) {
-                self::debugDump();
-            }
-        }
-
-        /**
-         * Immediately deletes the given session keys.
-         *
-         * @param array $keys
-         */
-        public static function forceClean(array $keys): void
-        {
-            self::ensureSession();
-
-            foreach ($keys as $key) {
-                if (!in_array($key, self::$preserveKeys, true) && isset($_SESSION[$key])) {
-                    unset($_SESSION[$key]);
-                    self::log("Force removed key: $key");
-                }
-            }
-
-            if (self::$autoDump) {
-                self::debugDump();
-            }
-        }
-
-        /**
-         * Prints a formatted dump of the current session state.
-         */
-        public static function debugDump(): void
-        {
-            if (!self::$debug) {
+            if (self::$hasRunAutoClean) {
                 return;
             }
 
-            self::ensureSession();
+            self::$hasRunAutoClean = true;
 
-            echo "\nSESSION DEBUG (" . date('H:i:s') . ")\n";
-            echo "Preserved Keys: " . implode(', ', self::$preserveKeys) . "\n";
-            echo str_repeat('-', 50) . "\n";
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                return;
+            }
 
             foreach ($_SESSION as $key => $value) {
-                if ($key === self::META_KEY) {
+
+                if (self::isPreserved($key)) {
                     continue;
                 }
 
-                $display = is_scalar($value) ? (string)$value : json_encode($value);
-                if (strlen($display) > self::$maxLogValueLength) {
-                    $display = substr($display, 0, self::$maxLogValueLength) . '...';
+                $tsKey = self::TS_PREFIX . $key;
+
+                if (!isset($_SESSION[$tsKey])) {
+                    continue;
                 }
 
-                echo "$key: $display\n";
+                $age = time() - (int)$_SESSION[$tsKey];
+
+                if ($age >= $maxAgeSeconds) {
+                    unset($_SESSION[$key], $_SESSION[$tsKey]);
+                }
             }
 
-            echo str_repeat('-', 50) . "\n";
+            // URL Debug Mode (?sc_debug=1)
+            if (isset($_GET['sc_debug']) && $_GET['sc_debug'] === '1') {
+                self::debugDump();
+            }
         }
 
         /**
-         * Ensures that a PHP session is active.
+         * Clean only specific keys if they are older than $maxAgeSeconds.
+         *
+         * Example:
+         *     SessionCleaner::clean(['user_id', 'temp_upload'], 1800);
+         *
+         * @param array $keys
+         * @param int $maxAgeSeconds
+         * @return void
          */
-        protected static function ensureSession(): void
+        public static function clean(array $keys, int $maxAgeSeconds): void
         {
             if (session_status() !== PHP_SESSION_ACTIVE) {
-                session_start();
+                return;
+            }
+
+            foreach ($keys as $key) {
+                if (self::isPreserved($key)) {
+                    continue;
+                }
+
+                $tsKey = self::TS_PREFIX . $key;
+
+                if (isset($_SESSION[$key]) && !isset($_SESSION[$tsKey])) {
+                    $_SESSION[$tsKey] = time();
+                }
+
+                if (!isset($_SESSION[$tsKey])) {
+                    continue;
+                }
+
+                $age = time() - (int)$_SESSION[$tsKey];
+
+                if ($age >= $maxAgeSeconds) {
+                    unset($_SESSION[$key], $_SESSION[$tsKey]);
+                }
+            }
+
+            // URL Debug Mode
+            if (isset($_GET['sc_debug']) && $_GET['sc_debug'] === '1') {
+                self::debugDump();
             }
         }
 
         /**
-         * Logs a message if debug mode is enabled.
+         * Print session contents for debugging.
+         * Does NOT modify any session data.
          *
-         * @param string $message
+         * Trigger manually:
+         *     SessionCleaner::debugDump();
+         *
+         * Or via URL: sc_debug=1
+         *
+         * @return void
          */
-        protected static function log(string $message): void
+        public static function debugDump(): void
         {
-            if (self::$debug) {
-                error_log('[SessionCleaner] ' . $message);
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                echo "Session not active.\n";
+                return;
             }
+
+            echo "<pre>";
+            echo "SESSION DEBUG (" . date("H:i:s") . ")\n";
+            echo "Preserved Keys: " . implode(', ', self::$preserveKeys) . "\n";
+            echo str_repeat('-', 60) . "\n";
+
+            foreach ($_SESSION as $key => $value) {
+                if (str_starts_with($key, self::TS_PREFIX)) {
+                    continue; // Hide internal timestamps from the main list
+                }
+
+                $tsKey = self::TS_PREFIX . $key;
+                $ts = $_SESSION[$tsKey] ?? null;
+                $age = $ts ? (time() - $ts . "s") : "n/a";
+
+                $display = is_scalar($value) ? var_export($value, true) : gettype($value);
+
+                echo "$key: $display";
+                echo "   (age: $age)\n";
+            }
+
+            echo str_repeat('-', 60) . "\n";
+            echo "</pre>";
         }
     }
