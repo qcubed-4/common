@@ -201,7 +201,7 @@ make sure to include them as well, so that SessionCleaner does not delete them d
 Place this in your backend header, e.g. BasePage, layout include, or controller bootstrap:
 
 ```php
-SessionCleaner::setPreserveKeys(['logged_user_id', 'csrf_token']);
+SessionCleaner::setPreserveKeys(['logged_user_id', 'csrf_token', 'qformstate']);
 SessionCleaner::autoClean(1800); // clean every 30 minutes
 ```
 
