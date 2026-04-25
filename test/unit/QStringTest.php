@@ -1,12 +1,13 @@
 <?php
 
 use QCubed\QString;
+    use QCubed\Test\UnitTestCaseBase;
 
-/**
+    /**
  *
  * @package Tests
  */
-class QStringTest extends \QCubed\Test\UnitTestCaseBase
+class QStringTest extends UnitTestCaseBase
 {
 
     public function testLongestCommonSubsequence()
@@ -44,7 +45,7 @@ class QStringTest extends \QCubed\Test\UnitTestCaseBase
 
     private function lcsCheckValueHelper($str1, $str2, $strExpectedResult)
     {
-        $strResult = \QCubed\QString::longestCommonSubsequence($str1, $str2);
+        $strResult = QString::longestCommonSubsequence($str1, $str2);
         $this->assertEquals($strExpectedResult, $strResult, "Longest common subsequence of '" . $str1 .
             "' and '" . $str2 . "' is '" . $strResult . "'");
     }

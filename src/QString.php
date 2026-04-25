@@ -9,9 +9,11 @@
 
     namespace QCubed;
 
-    use QCubed as Q;
+    use DOMDocument;
+    use DOMElement;
+    use DOMXPath;
     use QCubed\Exception\Caller;
-    use QCubed\Project\Application;
+
 
     /**
      * Abstract class QString
@@ -386,8 +388,7 @@
          *                                Defaults to a pre-defined set of letters and numbers.
          *
          * @return string A random string of the specified length generated from the given character set.
-         * @throws Caller If the specified length is less than 1 or the character set is empty.*@throws
-         *     \QCubed\Exception\Caller
+         * @throws Caller If the specified length is less than 1 or the character set is empty.
          */
         public static function getRandomString(int $intLength, string $strCharacterSet = self::LETTERS_NUMBERS): string
         {
@@ -573,33 +574,215 @@
         }
 
         /**
-         * Renders an obfuscated email link and generates the necessary JavaScript to decode
-         * and display it on the client-side upon a page load.
+         * Render one or multiple email addresses with lightweight harvesting protection (frontend output).
          *
-         * @param string $email The email address to be obfuscated and rendered.
-         * @param string|null $controlId Optional control ID to be used for the anchor element.
-         *                               If not provided, a unique ID will be generated.
-         * @return string The HTML anchor element with the obfuscated email, ready to be decoded and displayed.
-         * @throws Caller
+         * What it does:
+         * - Shows the email address immediately as normal, copyable text (good UX).
+         * - Does NOT output any `mailto:` link in the HTML source initially.
+         * - Stores the address split into two data attributes (no "@" in attributes):
+         *     - data-eu = email user part (before "@")
+         *     - data-ed = email domain part (after "@")
+         * - Inserts harmless HTML comment fragments around "@" and "." in the *visible text*
+         *   (e.g. `info<!-- -->@<!-- -->firma<!-- -->.<!-- -->ee`) to break simple regex-based
+         *   scrapers scanning raw HTML source. Browsers still render it as `info@firma.ee`,
+         *   and copy/paste remains normal.
+         *
+         * JavaScript setup (required for `mailto:`):
+         * Add the following code ONCE to your global JS bundle (e.g. main.js). It uses event
+         * delegation, so it automatically works for all links produced by this function.
+         *
+         * ```JavaScript
+         * document.addEventListener("pointerdown", (e) => {
+         *   const a = e.target.closest("a[data-eu][data-ed]");
+         *   if (a) a.href = `mailto:${a.dataset.eu}@${a.dataset.ed}`;
+         * }, { passive: true });
+         *
+         * document.addEventListener("keydown", (e) => {
+         *   if (e.key !== "Enter" && e.key !== " ") return;
+         *   const a = e.target.closest("a[data-eu][data-ed]");
+         *   if (a) a.href = `mailto:${a.dataset.eu}@${a.dataset.ed}`;
+         * });
+         * ```
+         *
+         * Input formats:
+         * - Single email string: "info@firma.ee"
+         * - Comma-separated list (typical DB format): "info@firma.ee, support@firma.ee"
+         * - Array of emails: ["info@firma.ee", "support@firma.ee"]
+         *
+         * Notes:
+         * - We intentionally DO NOT place the full email into aria-label/title attributes,
+         *   because some scrapers read those attributes too. The visible text is already
+         *   readable for users.
+         * - If a value is malformed, it is output as escaped plain text.
+         *
+         * Example usage:
+         * ```php
+         * echo QString::renderEmails($dbRow['emails'], ' | ');
+         * // where $dbRow['emails'] = "info@firma.ee, support@firma.ee"
+         * ```
+         *
+         * @param string|array $items     One email, a comma-separated list, or an array of emails.
+         * @param string       $separator Separator used between multiple rendered emails.
+         *
+         * @return string HTML markup containing protected email links.
          */
-        public static function renderObfuscatedEmail(string $email, ?string $controlId = null): string
+        public static function renderEmails(string|array $items, string $separator = ', '): string
         {
-            $encodedEmail = self::base64UrlSafeEncode($email);
-            $id = $controlId ?: 'obf_email_' . uniqid();
-
-            $js = <<<EOT
-        document.addEventListener("DOMContentLoaded", function() {
-            var element = document.getElementById("$id");
-            if (element) {
-                var decodedEmail = atob("$encodedEmail".replace(/-/g, '+').replace(/_/g, '/'));
-                element.href = "mailto:" + decodedEmail;
-                element.textContent = decodedEmail;
+            // DB is stored as a comma-separated string; also accept arrays for convenience.
+            if (!is_array($items)) {
+                $items = trim($items);
+                $items = ($items === '')
+                    ? []
+                    : array_filter(array_map('trim', explode(',', $items)), static fn($x) => $x !== '');
             }
-        })
-    EOT;
-            Application::executeJavaScript($js, Q\ApplicationBase::PRIORITY_HIGH);
 
-            return "<a href='#' id='$id' rel='nofollow noopener noreferrer'></a>";
+            $out = [];
+
+            foreach ($items as $email) {
+                $email = trim((string)$email);
+                if ($email === '') {
+                    continue;
+                }
+
+                $pos = strrpos($email, '@');
+                if ($pos === false || $pos === 0 || $pos >= strlen($email) - 1) {
+                    // Malformed: print as plain text (escaped)
+                    $out[] = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    continue;
+                }
+
+                $user = substr($email, 0, $pos);
+                $domain = substr($email, $pos + 1);
+
+                // Data attributes: no "@" in attributes, no "mailto:" anywhere
+                $safeUser = htmlspecialchars($user, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $safeDomain = htmlspecialchars($domain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+                // Visible text (escaped) + HTML comment obfuscation to break simple regex harvesting
+                $safeVisible = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $safeVisible = str_replace('@', '<!-- -->@<!-- -->', $safeVisible);
+                $safeVisible = str_replace('.', '<!-- -->.<!-- -->', $safeVisible);
+
+                $out[] = "<a href=\"#\" data-eu=\"{$safeUser}\" data-ed=\"{$safeDomain}\" rel=\"nofollow noopener noreferrer\">{$safeVisible}</a>";
+            }
+
+            return implode($separator, $out);
+        }
+
+        /**
+         * Obfuscate email links inside an HTML fragment for safe frontend output.
+         *
+         * This helper scans an HTML fragment (typically content produced by CKEditor or
+         * another WYSIWYG editor) and converts email links into a safer format that
+         * prevents simple email harvesting bots from scraping `mailto:` links directly
+         * from the HTML source.
+         *
+         * The function only modifies <a> elements that:
+         * - contain a native mailto: link, or
+         * - already display a plain email address as link text.
+         *
+         * All other HTML content is left untouched.
+         *
+         * The function is intended for frontend rendering only, not for database storage.
+         * This is important because editors such as CKEditor may strip or modify custom
+         * attributes during editing and saving.
+         *
+         * @param string $html HTML fragment that may contain email links.
+         *
+         * @return string HTML fragment with email links converted to the protected format.
+         */
+        public static function obfuscateEmailsForFrontendHtml(string $html): string
+        {
+            if (trim($html) === '') {
+                return $html;
+            }
+
+            if (!str_contains($html, '<a')) {
+                return $html;
+            }
+
+            // Fast exit: if there is clearly nothing email-related, do nothing.
+            if (
+                stripos($html, 'mailto:') === false &&
+                stripos($html, '@') === false &&
+                stripos($html, 'data-eu=') === false
+            ) {
+                return $html;
+            }
+
+            $doc = new DOMDocument('1.0', 'UTF-8');
+
+            // Wrap the fragment so we can safely extract only inner HTML later.
+            $wrapped = '<div>' . $html . '</div>';
+
+            // Important:
+            // Force DOMDocument to interpret the fragment as UTF-8.
+            $wrapped = '<?xml encoding="utf-8" ?>' . $wrapped;
+
+            $prev = libxml_use_internal_errors(true);
+            $loaded = $doc->loadHTML($wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+
+            if (!$loaded) {
+                return $html;
+            }
+
+            $xpath = new DOMXPath($doc);
+
+            /** @var DOMElement $a */
+            foreach ($xpath->query('//a') as $a) {
+                // Already safe -> keep it, only normalize href
+                if ($a->hasAttribute('data-eu') && $a->hasAttribute('data-ed')) {
+                    $a->setAttribute('href', '#');
+                    continue;
+                }
+
+                $href = trim((string)$a->getAttribute('href'));
+                $text = trim((string)$a->textContent);
+
+                $email = null;
+
+                // Case 1: native mailto:
+                if (stripos($href, 'mailto:') === 0) {
+                    $candidate = html_entity_decode(substr($href, 7), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $email = trim(explode('?', $candidate, 2)[0]);
+                }
+                // Case 2: the visible link text itself is an email
+                elseif ($text !== '' && filter_var($text, FILTER_VALIDATE_EMAIL)) {
+                    $email = $text;
+                }
+
+                if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    continue;
+                }
+
+                $pos = strrpos($email, '@');
+                if ($pos === false || $pos === 0 || $pos >= strlen($email) - 1) {
+                    continue;
+                }
+
+                $user = substr($email, 0, $pos);
+                $domain = substr($email, $pos + 1);
+
+                $a->setAttribute('href', '#');
+                $a->setAttribute('data-eu', $user);
+                $a->setAttribute('data-ed', $domain);
+                $a->setAttribute('rel', 'nofollow noopener noreferrer');
+            }
+
+            // Extract only the inner HTML of our wrapper div.
+            $div = $doc->getElementsByTagName('div')->item(0);
+            if (!$div) {
+                return $html;
+            }
+
+            $out = '';
+            foreach ($div->childNodes as $child) {
+                $out .= $doc->saveHTML($child);
+            }
+
+            return $out;
         }
 
         /**
@@ -611,7 +794,7 @@
         }
 
         /**
-         * Returns true if string contains any non-ASCII letter, number or hyphen.
+         * Returns true if a string contains any non-ASCII letter, number or hyphen.
          * (So string is only a-z, 0-9, -)
          */
         public static function containsNonCharacters(string $str): bool

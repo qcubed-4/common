@@ -1,12 +1,13 @@
 <?php
 
 use QCubed\Error\Handler;
+    use QCubed\Test\UnitTestCaseBase;
 
-/**
+    /**
  *
  * @package Tests
  */
-class ErrorTest extends \QCubed\Test\UnitTestCaseBase
+class ErrorTest extends UnitTestCaseBase
 {
     private static $err = null;
 

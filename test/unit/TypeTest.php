@@ -1,13 +1,14 @@
 <?php
 
-use QCubed\Type;
+    use QCubed\Test\UnitTestCaseBase;
+    use QCubed\Type;
 
 /**
  *
  * @package Tests
  */
 
-class TypeCastingTest extends \QCubed\Test\UnitTestCaseBase
+class TypeCastingTest extends UnitTestCaseBase
 {
     public function testCasting()
     {

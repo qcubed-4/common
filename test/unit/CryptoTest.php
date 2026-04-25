@@ -1,13 +1,17 @@
 <?php
-/**
+
+    use QCubed\Cryptography;
+    use QCubed\Test\UnitTestCaseBase;
+
+    /**
  * 
  * @package Tests
  */
-class QCryptoTest extends \QCubed\Test\UnitTestCaseBase {
+class QCryptoTest extends UnitTestCaseBase {
 
 	public function testDefaultCrypto() {
 		$strKey = 'abcdef';
-		$crypt = new \QCubed\Cryptography($strKey, true);
+		$crypt = new Cryptography($strKey, true);
 
 		$str = 'Bilge and bath water';
 
@@ -22,14 +26,14 @@ class QCryptoTest extends \QCubed\Test\UnitTestCaseBase {
 	public function testHashKey() {
 		$strKey = '1ab3cd5ef';
 		$strHashKey = '498un4';
-		$crypt = new \QCubed\Cryptography($strKey, null, null, $strHashKey);
+		$crypt = new Cryptography($strKey, null, null, $strHashKey);
 
 		$str = "She's buying a stairway to heaven";
 
 		$e = $crypt->encrypt($str);
 		$this->assertNotEquals($str, $e);
 
-		$crypt2 = new \QCubed\Cryptography($strKey, null, null, $strHashKey);
+		$crypt2 = new Cryptography($strKey, null, null, $strHashKey);
 		// test decrypt using 2nd instance of crypto using same key
 		// should use the embedded IV rather than the generated one
 		$str2  = $crypt2->decrypt($e);
@@ -39,14 +43,14 @@ class QCryptoTest extends \QCubed\Test\UnitTestCaseBase {
 	public function testBase64Off() {
 		$strKey = 'i4kl36';
 		$strHashKey = 'p834875';
-		$crypt = new \QCubed\Cryptography($strKey, false, null, $strHashKey);
+		$crypt = new Cryptography($strKey, false, null, $strHashKey);
 
 		$str = "I still haven't found what I'm looking for";
 
 		$e = $crypt->encrypt($str);
 		$this->assertNotEquals($str, $e);
 
-		$crypt2 = new \QCubed\Cryptography($strKey, false, null, $strHashKey);
+		$crypt2 = new Cryptography($strKey, false, null, $strHashKey);
 		// test decrypt using 2nd instance of crypto using same key
 		// should use the embedded IV rather than the generated one
 		$str2  = $crypt2->decrypt($e);
@@ -55,7 +59,7 @@ class QCryptoTest extends \QCubed\Test\UnitTestCaseBase {
 
 	public function testSerialize() {
 		$strKey = '438ppp87dgf';
-		$crypt = new \QCubed\Cryptography($strKey);
+		$crypt = new Cryptography($strKey);
 
 		$str = 'Mary had a little lamb, a little beef, a little ham';
 

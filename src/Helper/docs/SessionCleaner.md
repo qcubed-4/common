@@ -1,4 +1,4 @@
-# QCubed-4 SessionCleaner Utility
+# QCubed SessionCleaner Utility
 
 A lightweight utility for managing and automatically cleaning temporary PHP session keys inside QCubed-4 applications.
 
@@ -201,7 +201,7 @@ make sure to include them as well, so that SessionCleaner does not delete them d
 Place this in your backend header, e.g. BasePage, layout include, or controller bootstrap:
 
 ```php
-SessionCleaner::setPreserveKeys(['logged_user_id', 'csrf_token', 'qformstate']);
+SessionCleaner::setPreserveKeys(['logged_user_id', 'csrf_token']);
 SessionCleaner::autoClean(1800); // clean every 30 minutes
 ```
 

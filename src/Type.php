@@ -235,7 +235,7 @@
                 case Type::NO_OP:
                     return $mixItem;
                 case Type::CAST_ONLY:
-                    throw new Caller("Type::CAST_ONLY handling not yet implemented");
+                    throw new Caller("Type::CAST_ONLY handling isn't yet implemented");
                 case Type::CHECK_ONLY:
                     throw new Caller("Type::CHECK_ONLY handling not yet implemented");
                 case Type::CHECK_AND_CAST:

@@ -1,27 +1,27 @@
 <?php
 
-namespace QCubed;
+    namespace QCubed;
 
-/**
- *
- * Part of the QCubed PHP framework.
- *
- * @license MIT
- *
- */
+    /**
+     *
+     * Part of the QCubed PHP framework.
+     *
+     * @license MIT
+     *
+     */
 
-/**
- * QCubed Class
- *
- * Encapsulates system-wide constants, utility functions, etc.
- */
+    /**
+     * QCubed Class
+     *
+     * Encapsulates system-wide constants, utility functions, etc.
+     */
 
-class QCubed
-{
+    class QCubed
+    {
 
-    // Constants coordinating with qcubed.js
-    const string JSON_OBJECT_TYPE = 'qObjType';    // Indicates a PHP object we are serializing through the JsonSerialize interface
+        // Constants coordinating with qcubed.js
+        const string JSON_OBJECT_TYPE = 'qObjType';    // Indicates a PHP object we are serializing through the JsonSerialize interface
 
-    // Database constants
-    const int NAMED_VALUE_DELIMITER = 3;
-}
+        // Database constants
+        const int NAMED_VALUE_DELIMITER = 3;
+    }

@@ -52,5 +52,3 @@ SessionCleaner::setPreserveKeys(['logged_user_id', 'csrf_token', 'qformstate']);
 SessionCleaner::autoClean(1800);
 ```
 More details can be found in: docs/SessionCleaner.md
-
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/qcubed-4/common)

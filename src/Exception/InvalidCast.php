@@ -1,31 +1,30 @@
 <?php
 
-/**
- * Part of the QCubed PHP framework.
- *
- * @license MIT
- *
- */
-
-namespace QCubed\Exception;
-
-/**
- * The exception that is thrown by QType::Cast
- * if an invalid cast is performed.  InvalidCastException
- * derives from CallerException and therefore should be handled
- * similar to how CallerExceptions are handled (e.g., IncrementOffset should
- * be called whenever an InvalidCastException is caught and rethrown).
- * @was QInvalidCastException
- */
-class InvalidCast extends Caller
-{
     /**
-     * Constructor
-     * @param string $strMessage
-     * @param int $intOffset
+     * Part of the QCubed PHP framework.
+     *
+     * @license MIT
+     *
      */
-    public function __construct(string $strMessage, int $intOffset = 2)
+
+    namespace QCubed\Exception;
+
+    /**
+     * The exception that is thrown by QType::Cast
+     * if an invalid cast is performed.  InvalidCastException
+     * derives from CallerException and therefore should be handled
+     * similar to how CallerExceptions are handled (e.g., IncrementOffset should
+     * be called whenever an InvalidCastException is caught and rethrown).
+     */
+    class InvalidCast extends Caller
     {
-        parent::__construct($strMessage, $intOffset);
+        /**
+         * Constructor
+         * @param string $strMessage
+         * @param int $intOffset
+         */
+        public function __construct(string $strMessage, int $intOffset = 2)
+        {
+            parent::__construct($strMessage, $intOffset);
+        }
     }
-}

@@ -2,12 +2,13 @@
 
 use QCubed\File;
 use QCubed\Folder;
+    use QCubed\Test\UnitTestCaseBase;
 
-/**
+    /**
  *
  * @package Tests
  */
-class FileFolderTest extends \QCubed\Test\UnitTestCaseBase
+class FileFolderTest extends UnitTestCaseBase
 {
 
     public function testCreateAndTeardown()

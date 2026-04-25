@@ -1,12 +1,13 @@
 <?php
 
 use QCubed\QDateTime;
+    use QCubed\Test\UnitTestCaseBase;
 
-/**
+    /**
  *
  * @package Tests
  */
-class DateTimeTests extends \QCubed\Test\UnitTestCaseBase
+class DateTimeTests extends UnitTestCaseBase
 {
     public function testNow()
     {

@@ -2,13 +2,15 @@
 
 namespace QCubed\Test;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * Base class for all QCubed unit tests. Contains shared functionality.
  * @package Tests
  * @was QUnitTestCaseBase
  */
 
-abstract class UnitTestCaseBase extends \PHPUnit\Framework\TestCase
+abstract class UnitTestCaseBase extends TestCase
 {
     /**
      * Given an array of objects $arrObj, verifies that
