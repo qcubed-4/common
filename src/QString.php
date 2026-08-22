@@ -249,12 +249,17 @@
          *
          * This method is useful for technical strings such as URLs, slugs, filenames,
          * identifiers, or other values where consistent ASCII punctuation is preferred.
+         * Null and empty input values are returned as an empty string.
          *
-         * @param string $strString The input string to normalize.
-         * @return string The string with supported Unicode punctuation replaced by ASCII equivalents.
+         * @param string|null $strString The input string to normalize.
+         * @return string The normalized string, or an empty string if the input is null or empty.
          */
-        public static function normalizeAsciiPunctuation(string $strString): string
+        public static function normalizeAsciiPunctuation(?string $strString): string
         {
+            if ($strString === null || $strString === '') {
+                return '';
+            }
+
             return strtr($strString, [
                 '–' => '-',   // En dash
                 '—' => '-',   // Em dash
