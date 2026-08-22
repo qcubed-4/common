@@ -52,6 +52,28 @@
         }
 
         /**
+         * Performs a regular-expression replacement and guarantees a string result.
+         *
+         * @param string $pattern The regular expression pattern.
+         * @param string $replacement The replacement string.
+         * @param string $subject The input string.
+         * @return string The resulting string after replacement.
+         * @throws \RuntimeException If the regular expression cannot be processed.
+         */
+        private static function regexReplace(string $pattern, string $replacement, string $subject): string
+        {
+            $result = preg_replace($pattern, $replacement, $subject);
+
+            if ($result === null) {
+                throw new \RuntimeException(
+                    sprintf('Regular expression failed: %s (%s)', $pattern, preg_last_error_msg())
+                );
+            }
+
+            return $result;
+        }
+
+        /**
          * Returns the last character of a given string or null if the string is empty or null.
          *
          * @param string|null $strString The input string.
@@ -82,16 +104,6 @@
          */
         final public static function startsWith(string $strHaystack, string $strNeedle): bool
         {
-            if ($strNeedle === '') {
-                return true;
-            }
-
-            self::initQCubedEncoding();
-
-            if (self::$qcubedEncoding) {
-                return mb_substr($strHaystack, 0, mb_strlen($strNeedle, self::$qcubedEncoding), self::$qcubedEncoding) === $strNeedle;
-            }
-
             return str_starts_with($strHaystack, $strNeedle);
         }
 
@@ -104,16 +116,6 @@
          */
         final public static function endsWith(string $strHaystack, string $strNeedle): bool
         {
-            if ($strNeedle === '') {
-                return true;
-            }
-
-            self::initQCubedEncoding();
-
-            if (self::$qcubedEncoding) {
-                return mb_substr($strHaystack, -mb_strlen($strNeedle, self::$qcubedEncoding), null, self::$qcubedEncoding) === $strNeedle;
-            }
-
             return str_ends_with($strHaystack, $strNeedle);
         }
 
@@ -160,15 +162,8 @@
          */
         final public static function xmlEscape(string $strString): string
         {
-            self::initQCubedEncoding();
-
-            // Check for special characters in the string
-            if (
-                (self::$qcubedEncoding && (mb_strpos($strString, '<', 0, self::$qcubedEncoding) !== false || mb_strpos($strString, '&', 0, self::$qcubedEncoding) !== false)) ||
-                (!self::$qcubedEncoding && (str_contains($strString, '<') || str_contains($strString, '&')))
-            ) {
+            if (str_contains($strString, '<') || str_contains($strString, '&')) {
                 $strString = str_replace(']]>', ']]]]><![CDATA[>', $strString);
-                // Wrap the entire string in a CDATA section
                 $strString = sprintf('<![CDATA[%s]]>', $strString);
             }
 
@@ -186,20 +181,17 @@
          */
         final public static function longestCommonSubsequence(string $str1 = '', string $str2 = ''): string
         {
-            // Replace null values with empty strings
-            $str1 = $str1 ?? '';
-            $str2 = $str2 ?? '';
-
-            $str1Len = defined('QCUBED_ENCODING')
-                ? mb_strlen($str1, QCUBED_ENCODING)
-                : strlen($str1);
-            $str2Len = defined('QCUBED_ENCODING')
-                ? mb_strlen($str2, QCUBED_ENCODING)
-                : strlen($str2);
-
-            if ($str1Len === 0 || $str2Len === 0) {
+            if ($str1 === '' || $str2 === '') {
                 return '';
             }
+
+            self::initQCubedEncoding();
+            $encoding = self::$qcubedEncoding;
+
+            $arrStr1 = $encoding !== null ? mb_str_split($str1, 1, $encoding) : str_split($str1);
+            $arrStr2 = $encoding !== null ? mb_str_split($str2, 1, $encoding) : str_split($str2);
+            $str1Len = count($arrStr1);
+            $str2Len = count($arrStr2);
 
             $CSL = array_fill(0, $str1Len, array_fill(0, $str2Len, 0));
             $intLargestSize = 0;
@@ -207,7 +199,7 @@
 
             for ($i = 0; $i < $str1Len; $i++) {
                 for ($j = 0; $j < $str2Len; $j++) {
-                    if ($str1[$i] === $str2[$j]) {
+                    if ($arrStr1[$i] === $arrStr2[$j]) {
                         $CSL[$i][$j] = ($i === 0 || $j === 0)
                             ? 1
                             : $CSL[$i - 1][$j - 1] + 1;
@@ -218,7 +210,7 @@
                         }
 
                         if ($CSL[$i][$j] === $intLargestSize) {
-                            $ret[] = substr($str1, $i - $intLargestSize + 1, $intLargestSize);
+                            $ret[] = implode('', array_slice($arrStr1, $i - $intLargestSize + 1, $intLargestSize));
                         }
                     }
                 }
@@ -247,28 +239,51 @@
          */
         public static function base64UrlSafeDecode(string $s): string
         {
-            return base64_decode(strtr($s, '-_', '+/')) ?: ''; // Prevent returning `false`.
+            $decoded = base64_decode(strtr($s, '-_', '+/'), true);
+
+            return $decoded === false ? '' : $decoded;
+        }
+
+        /**
+         * Normalizes common Unicode punctuation characters to their ASCII equivalents.
+         *
+         * This method is useful for technical strings such as URLs, slugs, filenames,
+         * identifiers, or other values where consistent ASCII punctuation is preferred.
+         *
+         * @param string $strString The input string to normalize.
+         * @return string The string with supported Unicode punctuation replaced by ASCII equivalents.
+         */
+        public static function normalizeAsciiPunctuation(string $strString): string
+        {
+            return strtr($strString, [
+                '–' => '-',   // En dash
+                '—' => '-',   // Em dash
+                '−' => '-',   // Minus sign
+                '“' => '"',   // Left double quotation mark
+                '”' => '"',   // Right double quotation mark
+                '„' => '"',   // Double low-9 quotation mark
+                '‘' => "'",   // Left single quotation mark
+                '’' => "'",   // Right single quotation mark
+                '…' => '...', // Horizontal ellipsis
+            ]);
         }
 
         /**
          * Sanitizes a string to create a URL-safe representation by performing various cleanup and transformation steps.
          *
-         * @param string $strString The input string to be sanitized. Defaults to an empty string if null.
+         * @param string $strString The input string to be sanitized.
          * @param int|null $intMaxLength Optional maximum length for the sanitized string. If specified, the string will be truncated to this length.
          * @return string The sanitized, URL-safe string.
          */
         public static function sanitizeForUrl(string $strString = '', ?int $intMaxLength = null): string
         {
-            // Ensure the input is a string, handle null gracefully.
-            $strString = $strString ?? '';
-
             // Step 1: Remove all HTML tags from the string.
             $strString = strip_tags($strString);
 
             // Step 2: Preserve percent-encoded octets and clean up invalid % symbols.
-            $strString = preg_replace('/%([a-fA-F0-9][a-fA-F0-9])/', '--$1--', $strString); // Preserve percent-encoded octets.
+            $strString = self::regexReplace('/%([a-fA-F0-9][a-fA-F0-9])/', '--$1--', $strString); // Preserve percent-encoded octets.
             $strString = str_replace('%', '', $strString); // Strip out stray % symbols.
-            $strString = preg_replace('/--([a-fA-F0-9][a-fA-F0-9])--/', '%$1', $strString); // Restore valid percent-encoded octets.
+            $strString = self::regexReplace('/--([a-fA-F0-9][a-fA-F0-9])--/', '%$1', $strString); // Restore valid percent-encoded octets.
 
             // Step 3: Remove accents/diacritical marks from international characters.
             $strString = self::removeAccents($strString);
@@ -276,21 +291,23 @@
             // Step 4: Convert the string to lowercase to ensure uniformity.
             $strString = mb_convert_case($strString, MB_CASE_LOWER, 'UTF-8');
 
-            // Step 5: Remove HTML entities and replace some special characters (dots, colons).
-            $strString = preg_replace('/&.+?;/', '', $strString); // Remove encoded HTML entities like &amp;.
+            // Step 5: Remove HTML entities and normalize special characters.
+            $strString = self::regexReplace('/&.+?;/', '', $strString); // Remove encoded HTML entities like &amp;.
             $strString = str_replace(['.', '::'], '-', $strString); // Replace dots and double colons with a dash.
+            $strString = self::normalizeAsciiPunctuation($strString); // Normalize Unicode punctuation to ASCII equivalents.
 
             // Step 6: Replace spaces and trim unwanted characters.
-            $strString = preg_replace('/\s+/', '-', $strString); // Replace spaces with dashes.
-            $strString = preg_replace('|[\p{Ps}\p{Pe}\p{Pi}\p{Pf}\p{Po}\p{S}\p{Z}\p{C}\p{No}]+|u', '', $strString); // Remove unwanted punctuation, symbols, or control chars.
+            $strString = self::regexReplace('/\s+/', '-', $strString); // Replace spaces with dashes.
+            $strString = self::regexReplace('|[\p{Ps}\p{Pe}\p{Pi}\p{Pf}\p{Po}\p{S}\p{Z}\p{C}\p{No}]+|u', '', $strString); // Remove unwanted punctuation, symbols, or control chars.
 
             // Step 7: Remove duplicated dashes and trim from both ends.
-            $strString = preg_replace('/-+/', '-', $strString); // Collapse multiple dashes into a single dash.
+            $strString = self::regexReplace('/-+/', '-', $strString); // Collapse multiple dashes into a single dash.
             $strString = trim($strString, '-'); // Remove leading/trailing dashes.
 
             // Step 8: Truncate the string if a maximum length is specified.
-            if ($intMaxLength !== null && defined('QCUBED_ENCODING')) {
-                $strString = mb_substr($strString, 0, $intMaxLength, QCUBED_ENCODING);
+            if ($intMaxLength !== null) {
+                self::initQCubedEncoding();
+                $strString = mb_substr($strString, 0, $intMaxLength, self::$qcubedEncoding ?? 'UTF-8');
             }
 
             // Step 9: Ensure there are no trailing dashes left.
@@ -377,7 +394,7 @@
             | \xF0[\x90-\xBF][\x80-\xBF]{2}     # planes 1-3
             | [\xF1-\xF3][\x80-\xBF]{3}         # planes 4-15
             | \xF4[\x80-\x8F][\x80-\xBF]{2}     # plane 16
-        )*$%x', $strString) === 1);
+            )*$%x', $strString) === 1);
         }
 
         /**
@@ -429,11 +446,11 @@
          */
         public static function wordsFromCamelCase(string $strName): string
         {
-            if (empty($strName)) {
+            if ($strName === '') {
                 return '';
             }
 
-            return trim(preg_replace('/([a-z\d])([A-Z])|([A-Za-z])(\d)|(\d)([A-Za-z])/', '$1$3$5 $2$4$6', $strName));
+            return trim(self::regexReplace('/([a-z\d])([A-Z])|([A-Za-z])(\d)|(\d)([A-Za-z])/', '$1$3$5 $2$4$6', $strName));
         }
 
         /**
@@ -444,7 +461,13 @@
          */
         final public static function firstCharacter(string $strString): ?string
         {
-            return mb_substr($strString, 0, 1, defined('QCUBED_ENCODING') ? QCUBED_ENCODING : 'UTF-8') ?: null;
+            if ($strString === '') {
+                return null;
+            }
+
+            self::initQCubedEncoding();
+
+            return mb_substr($strString, 0, 1, self::$qcubedEncoding ?? 'UTF-8');
         }
 
         /**
@@ -455,11 +478,11 @@
          */
         public static function underscoreFromCamelCase(string $strName): string
         {
-            if (empty($strName)) {
+            if ($strName === '') {
                 return '';
             }
 
-            return strtolower(preg_replace('/([a-z\d])([A-Z])/', '$1_$2', $strName));
+            return strtolower(self::regexReplace('/([a-z\d])([A-Z])/', '$1_$2', $strName));
         }
 
         /**
@@ -550,7 +573,7 @@
             }
 
             $intSize = filesize($strFile);
-            if ($intSize === 0) {
+            if ($intSize === false || $intSize === 0) {
                 return '0 bytes';
             }
 
@@ -567,7 +590,8 @@
          * @param string $strEmail the email address to obfuscate
          * @return string the HTML of the obfuscated Email address
          */
-        public  static function obfuscateEmail(string $strEmail): string {
+        public static function obfuscateEmail(string $strEmail): string
+        {
             $strEmail = QString::htmlEntities($strEmail);
             $strEmail = str_replace('@', '<strong style="display: none;">' . md5(microtime()) . '</strong>&#064;<strong style="display: none;">' . md5(microtime()) . '</strong>', $strEmail);
             return str_replace('.', '<strong style="display: none;">' . md5(microtime()) . '</strong>&#046;<strong style="display: none;">' . md5(microtime()) . '</strong>', $strEmail);
@@ -621,19 +645,27 @@
          * // where $dbRow['emails'] = "info@firma.ee, support@firma.ee"
          * ```
          *
-         * @param string|array $items     One email, a comma-separated list, or an array of emails.
-         * @param string       $separator Separator used between multiple rendered emails.
+         * @param null|string|array $items One email, a comma-separated list, or an array of emails.
+         * @param string $separator Separator used between multiple rendered emails.
          *
          * @return string HTML markup containing protected email links.
          */
-        public static function renderEmails(string|array $items, string $separator = ', '): string
+        public static function renderEmails(string|array|null $items, string $separator = ', '): string
         {
+            if ($items === null) {
+                return '';
+            }
+
             // DB is stored as a comma-separated string; also accept arrays for convenience.
             if (!is_array($items)) {
                 $items = trim($items);
                 $items = ($items === '')
                     ? []
                     : array_filter(array_map('trim', explode(',', $items)), static fn($x) => $x !== '');
+            }
+
+            if (empty($items)) {
+                return '';
             }
 
             $out = [];
@@ -800,5 +832,36 @@
         public static function containsNonCharacters(string $str): bool
         {
             return (bool)preg_match('/[^a-z0-9-]/i', $str);
+        }
+
+        /**
+         * Normalizes a given URL by verifying its format and adding necessary prefixes
+         * if they are missing. Handles protocols such as http, https, mailto, and tel.
+         *
+         * @param string|null $url The input URL to be normalized. Can be null.
+         *
+         * @return string|null The normalized URL or null if the input is empty.
+         */
+        public static function normalizeUrl(?string $url): ?string
+        {
+            if ($url === null) {
+                return null;
+            }
+
+            $url = trim($url);
+
+            if ($url === '') {
+                return null;
+            }
+
+            if (preg_match('~^https?://~i', $url)) {
+                return $url;
+            }
+
+            if (preg_match('~^mailto:|^tel:~i', $url)) {
+                return $url;
+            }
+
+            return 'https://' . $url;
         }
     }
