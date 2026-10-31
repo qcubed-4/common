@@ -524,7 +524,6 @@
             return lcfirst(self::camelCaseFromUnderscore($strName));
         }
 
-
         /**
          * Converts a given string to its HTML entities representation, ensuring proper encoding
          * and handling of special characters.
@@ -868,5 +867,63 @@
             }
 
             return 'https://' . $url;
+        }
+
+        /**
+         * Convert a filename to portable ASCII without changing letter case.
+         * Replaces spaces/hyphens with underscores and preserves the final extension.
+         * Does not require optional PHP extensions.
+         */
+        public static function sanitizeForFile(string $filename): string
+        {
+            $filename = trim(basename(str_replace('\\', '/', $filename)));
+
+            $filename = strtr($filename, [
+                'Ä' => 'A', 'ä' => 'a', 'Ö' => 'O', 'ö' => 'o',
+                'Ü' => 'U', 'ü' => 'u', 'Õ' => 'O', 'õ' => 'o',
+                'Š' => 'S', 'š' => 's', 'Ž' => 'Z', 'ž' => 'z',
+                'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Å' => 'A',
+                'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+                'Æ' => 'AE', 'æ' => 'ae', 'Ç' => 'C', 'ç' => 'c',
+                'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+                'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I',
+                'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+                'Ñ' => 'N', 'ñ' => 'n', 'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O',
+                'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'Ø' => 'O', 'ø' => 'o',
+                'Œ' => 'OE', 'œ' => 'oe', 'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U',
+                'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'Ý' => 'Y', 'ý' => 'y',
+                'Ÿ' => 'Y', 'ÿ' => 'y', 'ß' => 'ss', 'ẞ' => 'SS',
+                'Ł' => 'L', 'ł' => 'l', 'Č' => 'C', 'č' => 'c',
+                'Ć' => 'C', 'ć' => 'c', 'Ř' => 'R', 'ř' => 'r',
+                'Ą' => 'A', 'ą' => 'a', 'Ę' => 'E', 'ę' => 'e',
+                'Ń' => 'N', 'ń' => 'n', 'Ś' => 'S', 'ś' => 's',
+                'Ź' => 'Z', 'ź' => 'z', 'Ż' => 'Z', 'ż' => 'z',
+            ]);
+            // macOS filenames may contain decomposed accents (e.g. a + combining diaeresis).
+            if (preg_match('//u', $filename) === 1) {
+                $filename = preg_replace('/\p{Mn}+/u', '', $filename);
+            }
+
+            $filename = preg_replace('/[^A-Za-z0-9._]+/', '_', $filename);
+            $filename = preg_replace('/_+/', '_', $filename);
+            $filename = trim($filename, '.');
+            $filename = preg_replace('/\.{2,}/', '_', $filename);
+
+            if ($filename === '') $filename = 'file';
+
+            $extension = pathinfo($filename, PATHINFO_EXTENSION);
+            $stem = $extension === '' ? $filename : substr($filename, 0, -strlen($extension) - 1);
+            $stem = trim($stem, '._');
+
+            if ($stem === '') $stem = 'file';
+            // Avoid Windows device names, including when an extension follows them.
+
+            if (preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $stem)) $stem = 'file_' . $stem;
+            // Leave room for the existing duplicate-name suffix (-1, -2, ...).
+            $extension = substr($extension, 0, 32);
+            $suffix = $extension === '' ? '' : '.' . $extension;
+            $stem = rtrim(substr($stem, 0, 240 - strlen($suffix)), '._');
+            return ($stem === '' ? 'file' : $stem) . $suffix;
         }
     }
