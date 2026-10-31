@@ -129,6 +129,9 @@
          * @param object|null $content Content object.
          * @param string|null $absoluteUrl Absolute page URL for canonical and og:url.
          * @param string|null $siteName Site name for og:site_name and apple-mobile-web-app-title.
+         * @param null|string $facebookDomainVerification
+         * @param null|string $facebookAppId
+         * @param null|string $facebookPageId
          * @param string|null $twitterSite Twitter/X handle, e.g. "@portal".
          * @param array $options Extra options:
          *   - title (string|null)
@@ -153,14 +156,22 @@
             ?object $content = null,
             ?string $absoluteUrl = null,
             ?string $siteName = null,
+            ?string $facebookDomainVerification = null,
+            ?string $facebookAppId = null,
+            ?string $facebookPageId = null,
             ?string $twitterSite = null,
             array $options = []
         ): PageMeta {
             $meta = self::build($frontendLink, $metadata, $content, $options);
 
             // canonical + og:url
-            $absoluteUrl = is_string($absoluteUrl) ? trim($absoluteUrl) : null;
-            if (!empty($absoluteUrl)) {
+            $absoluteUrl = is_string($absoluteUrl) ? trim($absoluteUrl) : '';
+
+            if ($absoluteUrl === '') {
+                $absoluteUrl = self::currentAbsoluteUrl();
+            }
+
+            if ($absoluteUrl !== '') {
                 $meta->canonicalUrl = $absoluteUrl;
                 $meta->ogUrl = $absoluteUrl;
             }
@@ -169,6 +180,18 @@
             $siteName = is_string($siteName) ? trim($siteName) : null;
             if (!empty($siteName)) {
                 $meta->ogSiteName = $siteName;
+            }
+
+            if (is_string($facebookDomainVerification) && trim($facebookDomainVerification) !== '') {
+                $meta->facebookDomainVerification = trim($facebookDomainVerification);
+            }
+
+            if ($facebookAppId !== null && trim($facebookAppId) !== '') {
+                $meta->facebookAppId = trim($facebookAppId);
+            }
+
+            if ($facebookPageId !== null && trim($facebookPageId) !== '') {
+                $meta->facebookPageId = trim($facebookPageId);
             }
 
             // robots
@@ -327,6 +350,25 @@
             }
 
             return $scheme . '://' . $host . '/' . ltrim($url, '/');
+        }
+
+        /**
+         * Build the current absolute URL from a request.
+         *
+         * Used as a safe fallback for canonical and og:url
+         * when Index.php/controller does not pass absolute URL explicitly.
+         */
+        private static function currentAbsoluteUrl(): string
+        {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? '';
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+            if ($host === '') {
+                return '';
+            }
+
+            return $scheme . '://' . $host . $uri;
         }
 
         /**

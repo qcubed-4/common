@@ -33,6 +33,11 @@
         public ?string $canonicalUrl = null;
 
         /**
+         * Facebook domain verification.
+         */
+        public ?string $facebookDomainVerification = null;
+
+        /**
          * Robots directive, for example:
          * "index,follow" or "noindex,nofollow"
          */
@@ -110,6 +115,16 @@
         public ?string $manifestUrl = null;
 
         /**
+         * Facebook app ID.
+         */
+        public ?string $facebookAppId = null;
+
+        /**
+         * Facebook page ID.
+         */
+        public ?string $facebookPageId = null;
+
+        /**
          * Preferred a modern favicon.
          * Example: /frontend/assets/favicon/favicon.svg
          */
@@ -157,6 +172,9 @@
                 'title' => $this->title,
                 'description' => $this->description,
                 'canonical' => $this->canonicalUrl,
+                'facebook-domain-verification' => $this->facebookDomainVerification,
+                'facebook-app-id' => $this->facebookAppId,
+                'facebook-page-id' => $this->facebookPageId,
                 'robots' => $this->robots,
 
                 'apple-mobile-web-app-title' => $this->appleMobileWebAppTitle,

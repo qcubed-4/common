@@ -58,6 +58,11 @@
                 $lines[] = self::line('<link rel="canonical" href="' . self::esc($meta->canonicalUrl) . '">', $indent);
             }
 
+            // --- Facebook domain verification ---
+            if (!empty($meta->facebookDomainVerification)) {
+                $lines[] = self::line('<meta name="facebook-domain-verification" content="' . self::esc($meta->facebookDomainVerification) . '">', $indent);
+            }
+
             // --- Robots ---
             if (!empty($meta->robots)) {
                 $lines[] = self::line('<meta name="robots" content="' . self::esc($meta->robots) . '">', $indent);
@@ -121,7 +126,17 @@
 
             // --- Manifest (PWA) ---
             if (!empty($meta->manifestUrl)) {
-                $lines[] = self::line('<link rel="manifest" href="' . self::esc($meta->manifestUrl) . '">', $indent);
+                $lines[] = self::line('<link rel="manifest" href="' . self::esc($meta->manifestUrl) . '" crossorigin="use-credentials">', $indent);
+            }
+
+            // --- Facebook app ID ---
+            if (!empty($meta->facebookAppId)) {
+                $lines[] = self::line('<meta property="fb:app_id" content="' . self::esc($meta->facebookAppId) . '">', $indent);
+            }
+
+            // --- Facebook page ID ---
+            if (!empty($meta->facebookPageId)) {
+                $lines[] = self::line('<meta property="fb:pages" content="' . self::esc($meta->facebookPageId) . '">', $indent);
             }
 
             // --- Open Graph ---

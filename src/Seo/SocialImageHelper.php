@@ -3,6 +3,8 @@
     namespace QCubed\Seo;
 
     use ContentCoverMedia;
+    use DOMDocument;
+    use DOMElement;
     use Files;
     use QCubed\Exception\Caller;
     use QCubed\Exception\InvalidCast;
@@ -11,18 +13,19 @@
      * Helper for producing absolute OG/Twitter image URLs.
      *
      * Supports:
-     *  - existing content cover media flow
+     *  - content cover media image flow
+     *  - video preview_file_path flow
      *  - direct file path flow
-     *  - generic collection flow (arrays/objects), e.g. gallery items, albums, custom items
-     *
-     * Works with your content objects that expose:
-     * - getMediaTypeId() / media_type_id
-     * - getContentCoverMediaId() / content_cover_media_id
+     *  - generic collection flow
+     *  - embedded media thumbnail fallback:
+     *      - HTML5 <video poster="">
+     *      - YouTube
+     *      - Vimeo basic ID detection
      *
      * Media handling rules:
      * - media_type_id = 1 => picture_id => Files::load(picture_id) => getPath()
      * - media_type_id = 2 => preview_file_path from ContentCoverMedia
-     * - media_type_id = 3 => video embed (skip)
+     * - media_type_id = 3 => preview_file_path first, then iframe fallback
      */
     final class SocialImageHelper
     {
@@ -62,20 +65,107 @@
         }
 
         /**
-         * Resolves a media URL or path based on given identifiers and parameters.
+         * A backwards-compatible helper for video-embed-based content cover media.
+         */
+        public static function resolveFromContentCoverMediaEmbed(
+            int $mediaTypeId,
+            int $contentCoverMediaId,
+            string $origin = ''
+        ): ?string {
+            if ($mediaTypeId !== 3 || $contentCoverMediaId <= 0) {
+                return null;
+            }
+
+            return self::resolveFromIds($mediaTypeId, $contentCoverMediaId, $origin, 'large');
+        }
+
+        /**
+         * Resolve poster/thumbnail URL from embedded media HTML.
+         */
+        public static function resolveFromEmbeddedMedia(string $html, string $origin = ''): ?string
+        {
+            $html = trim($html);
+            if ($html === '') {
+                return null;
+            }
+
+            return self::resolveVideoPosterFromHtml($html, $origin)
+                ?? self::resolveYoutubeThumbnailFromHtml($html)
+                ?? self::resolveVimeoThumbnailFromHtml($html);
+        }
+
+        /**
+         * Resolve the poster directly from HTML5 <video poster="">.
+         */
+        public static function resolveVideoPosterFromHtml(string $html, string $origin = ''): ?string
+        {
+            $dom = self::createDomDocument($html);
+            if (!$dom) {
+                return null;
+            }
+
+            foreach ($dom->getElementsByTagName('video') as $video) {
+                if (!$video instanceof DOMElement) {
+                    continue;
+                }
+
+                $poster = trim($video->getAttribute('poster'));
+                if ($poster === '') {
+                    continue;
+                }
+
+                $poster = html_entity_decode($poster, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                return self::toAbsoluteUrl($poster, $origin);
+            }
+
+            return null;
+        }
+
+        /**
+         * Resolve YouTube thumbnail from an iframe/embed HTML.
+         */
+        public static function resolveYoutubeThumbnailFromHtml(string $html): ?string
+        {
+            foreach (self::extractMediaUrlsFromHtml($html) as $url) {
+                $videoId = self::extractYoutubeVideoId($url);
+
+                if ($videoId !== null) {
+                    return 'https://img.youtube.com/vi/' . rawurlencode($videoId) . '/maxresdefault.jpg';
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * Resolve Vimeo thumbnail from an iframe/embed HTML.
          *
-         * @param int $mediaTypeId The type ID of the media (e.g., 1 for images, 2 for other types).
-         * @param int $contentCoverMediaId The ID of the content cover media.
-         * @param string $origin The origin from which the media is being requested.
-         * @param string $size The size parameter for the media, defaults to 'large'.
+         * Vimeo thumbnail URLs are not safely predictable without oEmbed/API.
+         * This method returns a practical no-API fallback via vumbnail.com.
+         */
+        public static function resolveVimeoThumbnailFromHtml(string $html): ?string
+        {
+            foreach (self::extractMediaUrlsFromHtml($html) as $url) {
+                $videoId = self::extractVimeoVideoId($url);
+
+                if ($videoId !== null) {
+                    return 'https://vumbnail.com/' . rawurlencode($videoId) . '.jpg';
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * Resolves a media URL or path based on given identifiers.
          *
-         * @return string|null The resolved media URL or path, or null if resolution fails.
          * @throws Caller
          * @throws InvalidCast
          */
         public static function resolveFromIds(int $mediaTypeId, int $contentCoverMediaId, string $origin, string $size = 'large'): ?string
         {
-            if ($mediaTypeId !== 1 && $mediaTypeId !== 2) {
+            if ($mediaTypeId !== 1 && $mediaTypeId !== 2 && $mediaTypeId !== 3) {
                 return null;
             }
 
@@ -88,8 +178,9 @@
                 return null;
             }
 
-            $path = '';
-
+            /*
+             * media_type_id = 1 => uploaded image
+             */
             if ($mediaTypeId === 1) {
                 $pictureId = self::readInt($cover, ['getPictureId', 'picture_id', 'PictureId']);
                 if (!$pictureId || !class_exists('Files') || !method_exists('Files', 'load')) {
@@ -101,27 +192,43 @@
                     return null;
                 }
 
-                $path = (string)$file->getPath();
+                return self::resolveFromPath((string)$file->getPath(), $origin, $size);
             }
 
-            if ($mediaTypeId === 2) {
-                $path = self::readString($cover);
+            /*
+             * media_type_id = 2 or 3 => preview_file_path.
+             *
+             * For video embeds this may contain a full external poster URL,
+             * for example, https://videoteek.ead.ee/thumb/...
+             */
+            $previewPath = self::readPreviewFilePath($cover);
+
+            if ($previewPath !== '') {
+                if (preg_match('~^https?://~i', $previewPath) || str_starts_with($previewPath, '//')) {
+                    return self::toAbsoluteUrl($previewPath, $origin);
+                }
+
+                return self::resolveFromPath($previewPath, $origin, $size);
             }
 
-            return self::resolveFromPath($path, $origin, $size);
+            /*
+             * media_type_id = 3 fallback:
+             * If preview_file_path is empty, try resolving from an iframe itself.
+             * This supports YouTube/Vimeo iframe thumbnails.
+             */
+            if ($mediaTypeId === 3) {
+                $embedHtml = self::readEmbedString($cover);
+
+                if ($embedHtml !== '') {
+                    return self::resolveFromEmbeddedMedia($embedHtml, $origin);
+                }
+            }
+
+            return null;
         }
 
         /**
          * Resolves a file path to an absolute URL based on the given origin and size.
-         *
-         * Example input path:
-         * V/pildigalerii/foo/bar.jpg
-         *
-         * @param string|null $path The relative file path to resolve. If null or empty, the method returns null.
-         * @param string $origin The base URL or origin to use for constructing the absolute URL.
-         * @param string $size The size of the resource, defaulting to 'large'.
-         *
-         * @return string|null The absolute URL for the provided path or null if the path is empty.
          */
         public static function resolveFromPath(?string $path, string $origin, string $size = 'large'): ?string
         {
@@ -136,13 +243,7 @@
         }
 
         /**
-         * Resolves a valid result from a list of paths based on the specified origin and size.
-         *
-         * @param array $paths An array of paths to search through for resolution.
-         * @param string $origin The origin parameter to use in the resolution process.
-         * @param string $size The size parameter to use in the resolution process. Defaults to 'large'.
-         *
-         * @return string|null The resolved result if found, or null if no result is resolved.
+         * Resolves the first valid result from a list of paths.
          */
         public static function resolveFromPaths(array $paths, string $origin, string $size = 'large'): ?string
         {
@@ -158,15 +259,6 @@
 
         /**
          * A generic resolver for arrays/objects.
-         *
-         * Example use-case:
-         *  - gallery image list
-         *  - album rows
-         *  - custom collections in future
-         *
-         * By default,
-         *  - status must equal 1
-         *  - path is read from getPath()/path/Path
          */
         public static function resolveFromCollection(
             array $items,
@@ -201,19 +293,6 @@
 
         /**
          * Converts a relative URL to an absolute URL using a specified origin.
-         *
-         * This method takes a URL and determines whether it is already an absolute URL
-         * (starting with http or https). If it is, the URL is returned as-is. If it is
-         * a relative URL, the method uses the provided origin to construct an absolute URL.
-         * Trailing slashes from the origin and leading slashes from the URL are managed
-         * to ensure proper concatenation.
-         *
-         * If the URL is empty or the origin is empty, the method returns the URL as-is.
-         *
-         * @param string $url The URL to be converted. It can be an absolute or relative URL.
-         * @param string $origin The base URL (origin) used to convert relative URLs to absolute URLs.
-         *
-         * @return string The absolute URL if the input is relative, or the original URL if it is already absolute.
          */
         public static function toAbsoluteUrl(string $url, string $origin): string
         {
@@ -226,6 +305,10 @@
                 return $url;
             }
 
+            if (str_starts_with($url, '//')) {
+                return 'https:' . $url;
+            }
+
             $origin = rtrim(trim($origin), '/');
             if ($origin === '') {
                 return $url;
@@ -235,12 +318,7 @@
         }
 
         /**
-         * Builds a sized path for uploads by appending the given size to the base upload URL.
-         *
-         * @param string $path The relative file path to be used in the generated URL.
-         * @param string $size The size of the upload, expected to be one of 'thumbnail', 'medium', or 'large'. Defaults to 'large'.
-         *
-         * @return string The constructed upload path including the specified size.
+         * Builds a sized path for uploads.
          */
         public static function buildUploadsSizedPath(string $path, string $size = 'large'): string
         {
@@ -254,18 +332,157 @@
         }
 
         /**
+         * Extract iframe/video/source/embed URLs from HTML.
+         *
+         * @return array<int, string>
+         */
+        private static function extractMediaUrlsFromHtml(string $html): array
+        {
+            $dom = self::createDomDocument($html);
+            if (!$dom) {
+                return [];
+            }
+
+            $urls = [];
+
+            foreach (['iframe', 'video', 'source', 'embed'] as $tagName) {
+                foreach ($dom->getElementsByTagName($tagName) as $node) {
+                    if (!$node instanceof DOMElement) {
+                        continue;
+                    }
+
+                    foreach (['src', 'data-src'] as $attribute) {
+                        $url = trim($node->getAttribute($attribute));
+                        if ($url !== '') {
+                            $urls[] = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        }
+                    }
+                }
+            }
+
+            return array_values(array_unique($urls));
+        }
+
+        /**
+         * Extract YouTube video ID from common YouTube URL formats.
+         */
+        private static function extractYoutubeVideoId(string $url): ?string
+        {
+            $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($url === '') {
+                return null;
+            }
+
+            if (str_starts_with($url, '//')) {
+                $url = 'https:' . $url;
+            }
+
+            $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+            $path = (string)parse_url($url, PHP_URL_PATH);
+            $query = (string)parse_url($url, PHP_URL_QUERY);
+
+            if ($host === '') {
+                return null;
+            }
+
+            if (str_contains($host, 'youtube.com')) {
+                parse_str($query, $params);
+
+                if (!empty($params['v']) && is_string($params['v'])) {
+                    return self::cleanVideoId($params['v']);
+                }
+
+                if (preg_match('~/embed/([A-Za-z0-9_-]{6,})~', $path, $matches)) {
+                    return self::cleanVideoId($matches[1]);
+                }
+
+                if (preg_match('~/shorts/([A-Za-z0-9_-]{6,})~', $path, $matches)) {
+                    return self::cleanVideoId($matches[1]);
+                }
+            }
+
+            if (str_contains($host, 'youtu.be')) {
+                $id = trim($path, '/');
+                if ($id !== '') {
+                    return self::cleanVideoId($id);
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * Extract Vimeo video ID from common Vimeo URL formats.
+         */
+        private static function extractVimeoVideoId(string $url): ?string
+        {
+            $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($url === '') {
+                return null;
+            }
+
+            if (str_starts_with($url, '//')) {
+                $url = 'https:' . $url;
+            }
+
+            $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+            $path = (string)parse_url($url, PHP_URL_PATH);
+
+            if ($host === '' || !str_contains($host, 'vimeo.com')) {
+                return null;
+            }
+
+            if (preg_match('~/(?:video/)?([0-9]{5,})~', $path, $matches)) {
+                return $matches[1];
+            }
+
+            return null;
+        }
+
+        /**
+         * Clean external video ID.
+         */
+        private static function cleanVideoId(string $id): ?string
+        {
+            $id = trim($id);
+
+            if ($id === '') {
+                return null;
+            }
+
+            if (!preg_match('~^[A-Za-z0-9_-]+$~', $id)) {
+                return null;
+            }
+
+            return $id;
+        }
+
+        /**
+         * Create DOMDocument safely from HTML fragment.
+         */
+        private static function createDomDocument(string $html): ?DOMDocument
+        {
+            $html = trim($html);
+            if ($html === '') {
+                return null;
+            }
+
+            $previous = libxml_use_internal_errors(true);
+
+            $dom = new DOMDocument('1.0', 'UTF-8');
+            $loaded = $dom->loadHTML(
+                '<?xml encoding="UTF-8">' . $html,
+                LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+            );
+
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+
+            return $loaded ? $dom : null;
+        }
+
+        /**
          * Reads an integer value from the given object by checking specified method or property names.
-         *
-         * This method iterates through the provided candidate names and checks for their existence
-         * as either methods or properties within the given object. If a method exists and returns
-         * a numeric value, it is cast to an integer and returned. Similarly, if a property exists
-         * with a numeric value, it is cast to an integer and returned. If no valid methods or properties
-         * are found, the method returns 0 by default.
-         *
-         * @param object $obj The object to read the integer value from.
-         * @param array $candidates An array of method or property names to check within the object.
-         *
-         * @return int The extracted integer value or 0 if no matching methods or properties are found.
          */
         private static function readInt(object $obj, array $candidates): int
         {
@@ -289,22 +506,49 @@
         }
 
         /**
-         * Reads a string value from the given object by checking defined method or property names.
-         *
-         * This method checks for the existence of certain method or property names
-         * within the provided object. If a method exists and its return value is a string
-         * or numeric, it is returned as a string. Similarly, if a property exists with
-         * a string or numeric value, it is returned as a string. If none of the specified
-         * methods or properties exist or are valid, an empty string is returned.
-         *
-         * @param object $obj The object to read the string value from.
-         *
-         * @return string The extracted string value or an empty string if no matching methods or properties are found.
+         * Reads preview_file_path from ContentCoverMedia.
          */
-        private static function readString(object $obj): string
+        private static function readPreviewFilePath(object $obj): string
         {
-            $candidates = ['getPreviewFilePath', 'preview_file_path', 'PreviewFilePath'];
+            return self::readStringByCandidates($obj, [
+                'getPreviewFilePath',
+                'preview_file_path',
+                'PreviewFilePath',
+            ]);
+        }
 
+        /**
+         * Reads embed HTML from ContentCoverMedia.
+         */
+        private static function readEmbedString(object $obj): string
+        {
+            return self::readStringByCandidates($obj, [
+                'getVideoEmbed',
+                'video_embed',
+                'VideoEmbed',
+                'getEmbedCode',
+                'getMediaEmbed',
+                'getContentEmbed',
+                'getIframeCode',
+                'getCode',
+                'embed_code',
+                'media_embed',
+                'content_embed',
+                'iframe_code',
+                'code',
+                'EmbedCode',
+                'MediaEmbed',
+                'ContentEmbed',
+                'IframeCode',
+                'Code',
+            ]);
+        }
+
+        /**
+         * Reads a string value from an object by checking candidate methods/properties.
+         */
+        private static function readStringByCandidates(object $obj, array $candidates): string
+        {
             foreach ($candidates as $key) {
                 if (method_exists($obj, $key)) {
                     $val = $obj->$key();
@@ -326,11 +570,6 @@
 
         /**
          * Reads an integer from an object or array using specified candidates.
-         *
-         * @param mixed $item The object or array to read the integer value from.
-         * @param array $candidates A list of candidate keys or methods to check in the object or array.
-         *
-         * @return int The integer value found based on the specified candidates, or 0 if no valid integer is found.
          */
         private static function mixedReadInt(mixed $item, array $candidates): int
         {
@@ -364,16 +603,7 @@
         }
 
         /**
-         * Extracts a string or numeric value from the given item, based on a list of candidate keys or methods.
-         *
-         * If the item is an object, the method checks if the candidates are either existing properties or methods
-         * and retrieves their value if it's a string or numeric. If the item is an array, the method checks
-         * if the candidates exist as keys and retrieves their value if it's a string or numeric.
-         *
-         * @param mixed $item The input item, which can be an object or an array.
-         * @param array $candidates A list of keys or method names to attempt retrieval from the item.
-         *
-         * @return string The extracted string or numeric value, returned as a string, or an empty string if no match is found.
+         * Extracts a string or numeric value from the given item.
          */
         private static function mixedReadString(mixed $item, array $candidates): string
         {
